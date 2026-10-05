@@ -559,16 +559,23 @@ async function refreshAccount() {
     chart.setAccountLines(
       (ov?.lines ?? []).map((l) => ({ price: Math.round(l.price * PRICE_SCALE), kind: l.kind, label: l.label, tone: l.tone })),
     );
-    renderAcctStrip(st.account, ov?.daily.status ?? "none", ov?.maxDrawdown.status ?? "none");
+    // the plan: no position on this market means no breach line, but the rooms
+    // are still worth showing
+    renderAcctStrip(st.account, ov?.daily.status ?? "none", ov?.maxDrawdown.status ?? "none", ov?.positions.length ?? 0);
+    embedNote(risk ? null : "Account loaded but it carried no risk snapshot — no lines until it does.");
   } catch (e) {
     embedNote(`Account refresh failed: ${(e as Error).message}`);
   }
 }
 
-function renderAcctStrip(a: AccountSummary, daily: string, dd: string) {
+function renderAcctStrip(a: AccountSummary, daily: string, dd: string, onThisMarket: number) {
   const r = a.risk;
-  if (!r) return;
   const bits: string[] = [];
+  if (!r) {
+    elAcctStrip.innerHTML = `<span>No risk snapshot for this account.</span><span class="ro">read-only</span>`;
+    elAcctStrip.hidden = false;
+    return;
+  }
   bits.push(`<span>Equity <b>${money(r.equity)}</b></span>`);
   const part = (label: string, room: number | null, floor: number | null, breached: string) => {
     const share = allowanceShare(room, a.starting_balance, floor);
@@ -580,6 +587,9 @@ function renderAcctStrip(a: AccountSummary, daily: string, dd: string) {
   part("Daily room", r.daily_loss_room, r.daily_loss_floor, daily);
   part("Max DD room", r.max_drawdown_room, r.max_drawdown_floor, dd);
   bits.push(`<span>Daily reset in <b>${untilReset(Date.now())}</b></span>`);
+  // saying so is more useful than an empty chart: it separates "flat here" from
+  // "we failed to match your position to this market"
+  if (!onThisMarket && market) bits.push(`<span>No position on <b>${esc(marketLabel(market))}</b></span>`);
   bits.push(`<span class="ro">read-only</span>`);
   elAcctStrip.innerHTML = bits.join("");
   elAcctStrip.hidden = false;

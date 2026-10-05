@@ -46,6 +46,10 @@ async function api(path) {
   }
   return await res.json();
 }
+async function apiData(path) {
+  const body = await api(path);
+  return body?.data ?? null;
+}
 async function corsProbe() {
   try {
     const res = await fetch(`${HOSTS.live}/v1/markets`, { credentials: "omit" });
@@ -63,10 +67,10 @@ async function accountState(accountId) {
   const p = (async () => {
     const q = `account_id=${encodeURIComponent(accountId)}`;
     const [account, policy, positions, orders] = await Promise.all([
-      api(`/v1/accounts/${encodeURIComponent(accountId)}`),
-      api(`/v1/accounts/${encodeURIComponent(accountId)}/trading-policy`).catch(() => null),
-      api(`/v1/positions?${q}&status=open`).then((r) => r.data ?? []),
-      api(`/v1/orders?${q}&status=working&limit=100`).then((r) => r.data ?? [])
+      apiData(`/v1/accounts/${encodeURIComponent(accountId)}`),
+      apiData(`/v1/accounts/${encodeURIComponent(accountId)}/trading-policy`).catch(() => null),
+      apiData(`/v1/positions?${q}&status=open`).then((d) => d ?? []),
+      apiData(`/v1/orders?${q}&status=working&limit=100`).then((d) => d ?? [])
     ]);
     return { account, policy, positions, orders, fetchedAt: Date.now() };
   })();
@@ -94,7 +98,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       case "corsProbe":
         return corsProbe();
       case "getAccounts":
-        return api("/v1/accounts").then((r) => ({ accounts: r.data ?? [] }));
+        return apiData("/v1/accounts").then((d) => ({ accounts: d ?? [] }));
       case "getAccountState":
         return accountState(msg.accountId);
     }

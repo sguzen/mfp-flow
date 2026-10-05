@@ -70,6 +70,16 @@ async function api<T>(path: string): Promise<T> {
 }
 
 /**
+ * Every endpoint here wraps its payload in `{ data: ... }`. Unwrapping at the
+ * call site is easy to forget on one line and not another — which is exactly
+ * what happened to the account and policy calls — so it happens here instead.
+ */
+async function apiData<T>(path: string): Promise<T> {
+  const body = await api<{ data?: T }>(path);
+  return (body?.data ?? null) as T;
+}
+
+/**
  * Prove this worker can read the REST API at all. The same call from a web page
  * is blocked by CORS (the API only allows MFP's docs origin), so a success here
  * is the host_permissions bypass working. Needs no key.
@@ -105,10 +115,10 @@ async function accountState(accountId: string): Promise<AccountState> {
   const p = (async (): Promise<AccountState> => {
     const q = `account_id=${encodeURIComponent(accountId)}`;
     const [account, policy, positions, orders] = await Promise.all([
-      api<unknown>(`/v1/accounts/${encodeURIComponent(accountId)}`),
-      api<unknown>(`/v1/accounts/${encodeURIComponent(accountId)}/trading-policy`).catch(() => null),
-      api<{ data?: unknown[] }>(`/v1/positions?${q}&status=open`).then((r) => r.data ?? []),
-      api<{ data?: unknown[] }>(`/v1/orders?${q}&status=working&limit=100`).then((r) => r.data ?? []),
+      apiData<unknown>(`/v1/accounts/${encodeURIComponent(accountId)}`),
+      apiData<unknown>(`/v1/accounts/${encodeURIComponent(accountId)}/trading-policy`).catch(() => null),
+      apiData<unknown[]>(`/v1/positions?${q}&status=open`).then((d) => d ?? []),
+      apiData<unknown[]>(`/v1/orders?${q}&status=working&limit=100`).then((d) => d ?? []),
     ]);
     return { account, policy, positions, orders, fetchedAt: Date.now() };
   })();
@@ -146,7 +156,7 @@ chrome.runtime.onMessage.addListener((msg: Msg, _sender, sendResponse) => {
       case "corsProbe":
         return corsProbe();
       case "getAccounts":
-        return api<{ data?: unknown[] }>("/v1/accounts").then((r) => ({ accounts: r.data ?? [] }));
+        return apiData<unknown[]>("/v1/accounts").then((d) => ({ accounts: d ?? [] }));
       case "getAccountState":
         return accountState(msg.accountId);
     }

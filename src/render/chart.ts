@@ -18,6 +18,7 @@ import { barDelta, type SessionStats } from "../analytics/series";
 import { barSource } from "../analytics/types";
 import type { ChartModel } from "../model";
 import { fmtDate, fmtDateTime, fmtSigned, fmtTime, fmtVol, type TimeZoneMode } from "./format";
+import { placeLabel, type Rect } from "./stack";
 import { alpha, hatchPattern, readPalette, type Palette } from "./theme";
 
 export interface ChartMeta {
@@ -81,6 +82,8 @@ export class FootprintChart {
   private raf = 0;
   private lastN = 0;
   private lastRow = 0;
+  /** context-label boxes already placed this frame, so they can stack instead of overlap */
+  private taken: Rect[] = [];
 
   // view state
   barW = 84;
@@ -298,6 +301,7 @@ export class FootprintChart {
     if (this.autoY) this.autoFitY();
 
     const [i0, i1] = this.visibleRange();
+    this.taken.length = 0;
     const row = m.settings.rowUnits;
     const rowH = row / this.upp;
 
@@ -729,7 +733,7 @@ export class FootprintChart {
       ctx.lineTo(L.plotX1, y);
       ctx.stroke();
       ctx.setLineDash([]);
-      this.pill(L.plotX1 - 70, y + (isHigh ? -9 : 9), isHigh ? "poor high" : "poor low", P.ctxMark);
+      this.pill(L.plotX1 - 70, y + (isHigh ? -9 : 9), isHigh ? "poor high" : "poor low", P.ctxMark, isHigh ? -1 : 1);
     }
     // failed auctions vs prior session references
     for (const fa of m.ctx.failed) {
@@ -765,7 +769,7 @@ export class FootprintChart {
       const q = fa.deltaQuality === "real" ? "" : fa.deltaQuality === "estimated" ? " est" : " mixed";
       const known = fa.deltaQuality === "real" || this.meta.estDelta;
       const lab = `failed ${isUp ? "above" : "below"} ${fa.ref.label.replace("prior ", "p")} · ${known ? `Δ${fmtSigned(fa.excursionDelta)}${q} ${fa.supported ? "with" : "against"}` : "Δ unknown"}`;
-      this.pill(ax, ay + (isUp ? -16 : 16), lab, P.ctxMark);
+      this.pill(ax, ay + (isUp ? -16 : 16), lab, P.ctxMark, isUp ? -1 : 1);
     }
   }
 
@@ -791,20 +795,47 @@ export class FootprintChart {
     }
   }
 
-  private pill(x: number, y: number, text: string, color: string) {
+  /**
+   * Draw a context label centred on (x, y), stacked clear of the labels already
+   * placed this frame by sliding along `dir` (-1 up, 1 down) away from the
+   * anchor. Returns false, and draws nothing, when there is no room left in the
+   * main plot — the context panel lists every marker, so the chart drops the
+   * label rather than printing a pile of unreadable boxes.
+   */
+  private pill(x: number, y: number, text: string, color: string, dir: 1 | -1 = 1): boolean {
     const ctx = this.ctx;
+    const L = this.L;
     ctx.font = `10px ${SANS}`;
     const w = ctx.measureText(text).width + 8;
-    const L = this.L;
     const px = Math.max(L.plotX0 + 2, Math.min(L.plotX1 - w - 2, x - w / 2));
+    const spot = placeLabel(
+      { x0: px, x1: px + w, y0: y - 7, y1: y + 7 },
+      this.taken,
+      dir,
+      { gap: 2, minY: L.mainY0 + 1, maxY: L.mainY1 - 1 },
+    );
+    if (!spot.fits) return false;
+    this.taken.push({ x0: px, x1: px + w, y0: spot.y0, y1: spot.y1 });
+    const cy = spot.y0 + 7;
+    // a label shifted off its anchor gets a leader line back to it
+    if (Math.abs(cy - y) > 1) {
+      ctx.strokeStyle = alpha(color, 0.45);
+      ctx.setLineDash([1, 2]);
+      ctx.beginPath();
+      ctx.moveTo(Math.round(x) + 0.5, y);
+      ctx.lineTo(Math.round(x) + 0.5, dir === 1 ? spot.y0 : spot.y1);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
     ctx.fillStyle = alpha(this.pal.panel, 0.92);
-    ctx.fillRect(px, y - 7, w, 14);
+    ctx.fillRect(px, spot.y0, w, 14);
     ctx.strokeStyle = alpha(color, 0.8);
-    ctx.strokeRect(px + 0.5, y - 6.5, w - 1, 13);
+    ctx.strokeRect(px + 0.5, spot.y0 + 0.5, w - 1, 13);
     ctx.fillStyle = color;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(text, px + 4, y + 0.5);
+    ctx.fillText(text, px + 4, cy + 0.5);
+    return true;
   }
 
   private drawLastPrice() {

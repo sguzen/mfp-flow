@@ -48,6 +48,9 @@ async function send<T>(msg: unknown): Promise<T> {
 
 export const keyStatus = () => send<{ present: boolean; env: "sandbox" | "live" | null }>({ type: "keyStatus" });
 export const getAccounts = () => send<{ accounts: AccountSummary[] }>({ type: "getAccounts" });
+export const getQuote = (marketId: string) =>
+  send<{ mid: number | null; bid: number | null; ask: number | null; time: number | null }>({ type: "getQuote", marketId });
+
 export const getAccountState = (accountId: string) =>
   send<{
     account: AccountSummary;

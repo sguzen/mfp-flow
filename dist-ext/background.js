@@ -78,6 +78,12 @@ async function accountState(accountId) {
   p.catch(() => inFlight.delete(accountId));
   return p;
 }
+async function quote(marketId) {
+  const q = await apiData(
+    `/v1/markets/${encodeURIComponent(marketId)}/quote`
+  );
+  return { mid: q?.mid ?? null, bid: q?.bid ?? null, ask: q?.ask ?? null, time: q?.time ?? null };
+}
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
     switch (msg.type) {
@@ -101,6 +107,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         return apiData("/v1/accounts").then((d) => ({ accounts: d ?? [] }));
       case "getAccountState":
         return accountState(msg.accountId);
+      case "getQuote":
+        return quote(msg.marketId);
     }
   })().then((data) => sendResponse({ ok: true, data })).catch((e) => sendResponse({ ok: false, error: e.message, status: e.status }));
   return true;

@@ -11,7 +11,7 @@ import { MarketFeed, type FeedChange } from "./data/feed";
 import { DEFAULT_MARKET_ID, defaultSession, isTradFi, loadMarkets, marketLabel, type Market } from "./data/markets";
 import { loadMinutes, saveMinutes } from "./data/persist";
 import { MarketStream } from "./data/stream";
-import { allowanceShare, getAccountState, getAccounts, inExtension, keyStatus, type AccountSummary } from "./ext/account";
+import { allowanceShare, getAccountState, getAccounts, getQuote, inExtension, keyStatus, type AccountSummary } from "./ext/account";
 import { parseEmbed, isMarketMessage } from "./ext/embed";
 import { matchMarket } from "./ext/market-from-url";
 import { classifyMarket } from "./risk/costs";
@@ -494,6 +494,7 @@ const elAcctStrip = $<HTMLDivElement>("acctStrip");
 let accounts: AccountSummary[] = [];
 let acctId: string | null = null;
 let acctTimer = 0;
+let markSource: "MFP mid" | "stream" = "stream";
 
 const money = (n: number | null | undefined) =>
   n == null ? "—" : `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
@@ -538,10 +539,15 @@ async function initAccounts() {
 async function refreshAccount() {
   if (!acctId || !market) return;
   try {
-    const st = await getAccountState(acctId);
+    const [st, q] = await Promise.all([getAccountState(acctId), getQuote(market.market_id).catch(() => null)]);
     const risk = st.account.risk ?? null;
     const { assetClass } = classifyMarket(market.provider, market.coin);
-    const mark = feed?.lastPrice != null ? feed.lastPrice / PRICE_SCALE : null;
+    // The room is measured against MFP's marks, so the line has to be anchored
+    // on MFP's mid, not the venue's last trade — they diverged by 0.07 on SOL,
+    // which moved the floor by the same amount. The stream price is only a
+    // fallback, and the strip says which one is in use.
+    markSource = q?.mid != null ? "MFP mid" : "stream";
+    const mark = q?.mid ?? (feed?.lastPrice != null ? feed.lastPrice / PRICE_SCALE : null);
     const ov =
       mark != null && risk
         ? buildOverlay({
@@ -590,6 +596,7 @@ function renderAcctStrip(a: AccountSummary, daily: string, dd: string, onThisMar
   // saying so is more useful than an empty chart: it separates "flat here" from
   // "we failed to match your position to this market"
   if (!onThisMarket && market) bits.push(`<span>No position on <b>${esc(marketLabel(market))}</b></span>`);
+  else bits.push(`<span>Floors vs <b>${esc(markSource)}</b></span>`);
   bits.push(`<span class="ro">read-only</span>`);
   elAcctStrip.innerHTML = bits.join("");
   elAcctStrip.hidden = false;

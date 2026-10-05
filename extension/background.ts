@@ -127,8 +127,22 @@ async function accountState(accountId: string): Promise<AccountState> {
   return p;
 }
 
+/**
+ * MFP's own mid for a market. The account's room is measured against MFP's
+ * marks, so a breach line has to be anchored on the same price — the venue's
+ * last trade can sit meaningfully away from it.
+ */
+async function quote(marketId: string): Promise<{ mid: number | null; bid: number | null; ask: number | null; time: number | null }> {
+  // the market id contains a pipe, which has to be encoded in a path segment
+  const q = await apiData<{ mid?: number; bid?: number; ask?: number; time?: number }>(
+    `/v1/markets/${encodeURIComponent(marketId)}/quote`,
+  );
+  return { mid: q?.mid ?? null, bid: q?.bid ?? null, ask: q?.ask ?? null, time: q?.time ?? null };
+}
+
 type Msg =
   | { type: "keyStatus" }
+  | { type: "getQuote"; marketId: string }
   | { type: "setKey"; key: string }
   | { type: "clearKey" }
   | { type: "corsProbe" }
@@ -159,6 +173,8 @@ chrome.runtime.onMessage.addListener((msg: Msg, _sender, sendResponse) => {
         return apiData<unknown[]>("/v1/accounts").then((d) => ({ accounts: d ?? [] }));
       case "getAccountState":
         return accountState(msg.accountId);
+      case "getQuote":
+        return quote(msg.marketId);
     }
   })()
     .then((data) => sendResponse({ ok: true, data }))

@@ -169,6 +169,35 @@ export class FootprintChart {
     this.request();
   }
 
+  /**
+   * Re-render into an offscreen canvas at `scale` device pixels per CSS pixel,
+   * for export. The crosshair is suppressed and the on-screen canvas is put
+   * back exactly as it was, even if drawing throws.
+   */
+  snapshot(scale = 2): HTMLCanvasElement {
+    const out = document.createElement("canvas");
+    out.width = Math.round(this.L.w * scale);
+    out.height = Math.round(this.L.h * scale);
+    const prev = { dpr: this.dpr, w: this.canvas.width, h: this.canvas.height, mouse: this.mouse };
+    try {
+      this.dpr = scale;
+      this.mouse = null;
+      this.canvas.width = out.width;
+      this.canvas.height = out.height;
+      this.makePatterns();
+      this.draw();
+      out.getContext("2d")?.drawImage(this.canvas, 0, 0);
+    } finally {
+      this.dpr = prev.dpr;
+      this.mouse = prev.mouse;
+      this.canvas.width = prev.w;
+      this.canvas.height = prev.h;
+      this.makePatterns();
+      this.draw();
+    }
+    return out;
+  }
+
   private makePatterns() {
     this.hatch = hatchPattern(this.ctx, alpha(this.pal.est, 0.55), this.dpr);
     this.hatchProfile = hatchPattern(this.ctx, alpha(this.pal.est, 0.75), this.dpr);

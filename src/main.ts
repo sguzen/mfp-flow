@@ -5,15 +5,18 @@
  */
 import "./style.css";
 import { locationVsValue, valueRelation } from "./analytics/auction";
-import { decimalsFor, formatUnits } from "./analytics/price";
+import { decimalsFor, formatUnits, PRICE_SCALE } from "./analytics/price";
 import type { SessionMode } from "./analytics/session";
 import { MarketFeed, type FeedChange } from "./data/feed";
 import { DEFAULT_MARKET_ID, defaultSession, isTradFi, loadMarkets, marketLabel, type Market } from "./data/markets";
 import { loadMinutes, saveMinutes } from "./data/persist";
 import { MarketStream } from "./data/stream";
+import { parseLink, serializeLink, type LinkState } from "./link";
 import { ChartModel, type ViewMode } from "./model";
 import { FootprintChart } from "./render/chart";
+import { composeSnapshot, snapshotCaption, snapshotFilename } from "./render/snapshot";
 import { fmtDate, fmtDateTime, fmtSigned, fmtTime, fmtUsd, fmtVol, type TimeZoneMode } from "./render/format";
+import { readPalette } from "./render/theme";
 
 // ---------- persisted UI settings (best effort) ----------
 interface UiSettings {
@@ -69,17 +72,71 @@ function saveUi() {
   }
 }
 const ui = loadUi();
+/** per-market link parts, consumed by the first selectMarket() */
+let pendingLink: LinkState | null = null;
+const bootLink = parseLink(location.hash);
+applyLink(bootLink);
 
-// deep link: #XYZ100, #BTCUSDT or #binance|BTCUSDT
-function marketFromHash(markets: Market[]): string | null {
-  const h = decodeURIComponent(location.hash.replace(/^#/, "")).trim();
-  if (!h) return null;
-  const up = h.toUpperCase();
+// ---------- deep links ----------
+// The hash carries the whole view (see src/link.ts). Anything it specifies wins
+// over the saved settings, so a shared link reproduces the sender's chart.
+function marketFromToken(markets: Market[], token: string | undefined): string | null {
+  if (!token) return null;
+  const up = token.trim().toUpperCase();
+  if (!up) return null;
   const m =
     markets.find((x) => x.market_id.toUpperCase() === up) ??
     markets.find((x) => x.coin.toUpperCase() === up || x.coin.toUpperCase() === `XYZ:${up}`) ??
     markets.find((x) => x.symbol.toUpperCase() === up);
   return m?.market_id ?? null;
+}
+
+/**
+ * Fold the view-wide parts of a link into `ui`. `row` and `session` are
+ * per-market, so they wait for the market to resolve (see `pendingLink`).
+ */
+function applyLink(l: LinkState) {
+  if (l.view) ui.view = l.view;
+  if (l.tf != null) ui.tf = l.tf;
+  if (l.days != null) ui.days = l.days;
+  if (l.rightProfile) ui.rightProfile = l.rightProfile;
+  pendingLink = l.row != null || l.session ? l : null;
+}
+
+/** Push `ui` back into the controls, after a link changed it under them. */
+function syncControls() {
+  for (const b of elTf.querySelectorAll("button")) {
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String(Number((b as HTMLElement).dataset.v) === ui.tf));
+  }
+  for (const b of elView.querySelectorAll("button")) {
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String((b as HTMLElement).dataset.v === ui.view));
+  }
+  elDays.value = String(ui.days);
+  elRprof.value = ui.rightProfile;
+  if (market) {
+    elMarket.value = market.market_id;
+    elSession.value = sessionModeFor(market);
+  }
+}
+
+/** Rewrite the hash to the current view, without touching history. */
+function syncHash() {
+  if (!market) return;
+  const body = serializeLink({
+    market: market.market_id,
+    view: ui.view,
+    tf: ui.tf,
+    days: ui.days,
+    rightProfile: ui.rightProfile,
+    // only once a real row is in force for this market
+    row: feed?.buckets ? model.settings.rowUnits / PRICE_SCALE : undefined,
+    session: sessionModeFor(market),
+  });
+  const next = `#${body}`;
+  // replaceState does not fire hashchange, so this cannot loop
+  if (location.hash !== next) history.replaceState(null, "", next);
 }
 
 // ---------- DOM ----------
@@ -225,6 +282,7 @@ function rebuild() {
   });
   showEmpty();
   renderPanel();
+  syncHash();
 }
 
 function showEmpty() {
@@ -249,10 +307,16 @@ async function selectMarket(id: string) {
   }
   market = m;
   ui.market = m.market_id;
+  if (pendingLink) {
+    // rowKey() depends on ui.view, which applyLink() has already set
+    if (pendingLink.session) ui.sessionByMarket[m.market_id] = pendingLink.session;
+    if (pendingLink.row != null) ui.rowByMarket[rowKey(m)] = Math.round(pendingLink.row * PRICE_SCALE);
+    pendingLink = null;
+  }
   saveUi();
   elMarket.value = m.market_id;
   elSession.value = sessionModeFor(m);
-  history.replaceState(null, "", `#${encodeURIComponent(m.market_id)}`);
+  syncHash();
   document.title = `${marketLabel(m)} · mfp·flow`;
   chart.resetView(defaultBarW());
   model.build(null);
@@ -387,9 +451,107 @@ document.addEventListener("click", (e) => {
   if (d.open && !d.contains(e.target as Node)) d.open = false;
 });
 window.addEventListener("hashchange", () => {
-  const id = marketFromHash(markets);
-  if (id && id !== market?.market_id) void selectMarket(id);
+  const l = parseLink(location.hash);
+  applyLink(l);
+  syncControls();
+  const id = marketFromToken(markets, l.market);
+  // selectMarket() reloads history, which a row/session change also needs
+  if ((id && id !== market?.market_id) || pendingLink) void selectMarket(id ?? market?.market_id ?? ui.market);
+  else schedule();
 });
+// ---------- share ----------
+const elShareNote = $<HTMLParagraphElement>("shareNote");
+let noteTimer = 0;
+function note(msg: string, tone: "" | "ok" | "bad" = "") {
+  elShareNote.textContent = msg;
+  if (tone) elShareNote.dataset.tone = tone;
+  else delete elShareNote.dataset.tone;
+  clearTimeout(noteTimer);
+  noteTimer = window.setTimeout(() => {
+    elShareNote.textContent = "The link restores this exact view.";
+    delete elShareNote.dataset.tone;
+  }, 4000);
+}
+
+/** The chart at 2x with the attribution footer baked in. */
+function buildSnapshot(): { canvas: HTMLCanvasElement; name: string } | null {
+  if (!market || !model.bars.length) return null;
+  const scale = 2;
+  const pal = readPalette();
+  const at = new Date();
+  const last = model.sessions[model.sessions.length - 1];
+  const caption = snapshotCaption({
+    market: marketLabel(market),
+    view: ui.view,
+    tfMin: ui.tf,
+    sessionDate: last ? fmtDate(last.start, ui.tz) : "—",
+    at,
+  });
+  const canvas = composeSnapshot({
+    chart: chart.snapshot(scale),
+    caption,
+    scale,
+    bg: pal.bg,
+    fg: pal.text,
+    dim: pal.dim,
+    border: pal.grid,
+  });
+  return { canvas, name: snapshotFilename(market.market_id, ui.view, at) };
+}
+
+function toBlob(c: HTMLCanvasElement): Promise<Blob | null> {
+  return new Promise((res) => c.toBlob(res, "image/png"));
+}
+
+function saveBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+$("snapDownload").addEventListener("click", async () => {
+  const snap = buildSnapshot();
+  if (!snap) return note("Nothing to snapshot yet.", "bad");
+  const blob = await toBlob(snap.canvas);
+  if (!blob) return note("Couldn't render the image.", "bad");
+  saveBlob(blob, snap.name);
+  note("Saved.", "ok");
+});
+
+$("snapCopy").addEventListener("click", async () => {
+  const snap = buildSnapshot();
+  if (!snap) return note("Nothing to snapshot yet.", "bad");
+  const blob = await toBlob(snap.canvas);
+  if (!blob) return note("Couldn't render the image.", "bad");
+  // Clipboard images need a secure context and a permissive browser; fall back
+  // to a download rather than leaving the click with nothing to show for it.
+  try {
+    const Item = (window as unknown as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+    if (!Item || !navigator.clipboard?.write) throw new Error("no clipboard image support");
+    await navigator.clipboard.write([new Item({ "image/png": blob })]);
+    note("Image copied.", "ok");
+  } catch {
+    saveBlob(blob, snap.name);
+    note("Clipboard blocked — downloaded instead.", "ok");
+  }
+});
+
+$("snapLink").addEventListener("click", async () => {
+  syncHash();
+  const url = location.href;
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("no clipboard");
+    await navigator.clipboard.writeText(url);
+    note("Link copied.", "ok");
+  } catch {
+    // last resort: put it somewhere the user can copy by hand
+    window.prompt("Copy this link:", url);
+  }
+});
+
 window.addEventListener("pagehide", () => void feed?.flushPersist());
 
 // ---------- context panel ----------
@@ -546,12 +708,7 @@ function renderPanel() {
 
 // ---------- boot ----------
 async function boot() {
-  for (const b of elTf.querySelectorAll("button")) b.setAttribute("role", "radio");
-  for (const b of elTf.querySelectorAll("button")) b.setAttribute("aria-checked", String(Number((b as HTMLElement).dataset.v) === ui.tf));
-  for (const b of elView.querySelectorAll("button")) {
-    b.setAttribute("role", "radio");
-    b.setAttribute("aria-checked", String((b as HTMLElement).dataset.v === ui.view));
-  }
+  syncControls();
   elRow.innerHTML = "<option>—</option>";
   elRow.disabled = true;
   renderPanel();
@@ -566,7 +723,7 @@ async function boot() {
     `<optgroup label="Featured">${featured.map(opt).join("")}</optgroup>` +
     `<optgroup label="Indices, metals, stocks & FX">${tradfi.map(opt).join("")}</optgroup>` +
     `<optgroup label="Crypto">${crypto.map(opt).join("")}</optgroup>`;
-  await selectMarket(marketFromHash(markets) ?? ui.market);
+  await selectMarket(marketFromToken(markets, bootLink.market) ?? ui.market);
 }
 
 // periodic repaint so the "now" edge and clocks move even when quiet

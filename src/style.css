@@ -122,6 +122,15 @@ select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px
 }
 .menu-body label { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .menu-body label.inline { justify-content: space-between; color: var(--c-dim); }
+.menu-body button {
+  text-align: left; padding: 7px 9px; border-radius: 6px;
+  background: var(--c-bg); border: 1px solid var(--c-border); color: var(--c-text);
+}
+.menu-body button:hover:not(:disabled) { border-color: var(--c-faint); }
+.menu-body button:disabled { opacity: 0.55; }
+.menu-note { margin: 2px 0 0; color: var(--c-dim); font-size: 11px; line-height: 1.4; }
+.menu-note[data-tone="ok"] { color: var(--c-buy); }
+.menu-note[data-tone="bad"] { color: var(--c-sell); }
 .spacer { flex: 1; }
 .status { display: flex; align-items: center; gap: 7px; color: var(--c-dim); font-size: 12px; }
 .status .led { width: 8px; height: 8px; border-radius: 50%; background: var(--c-faint); }

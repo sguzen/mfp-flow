@@ -1046,9 +1046,31 @@ export class FootprintChart {
     const P = this.pal;
     const colorOf = (t: AccountLine["tone"]) => (t === "bad" ? P.sell : t === "good" ? P.buy : t === "warn" ? P.poc : P.text);
     for (const l of this.accountLines) {
-      const y = Math.round(this.yOf(l.price)) + 0.5;
-      if (y < L.mainY0 - 2 || y > L.mainY1 + 2) continue;
+      const raw = this.yOf(l.price);
       const col = colorOf(l.tone);
+      // A breach floor is often far outside a tight view — on a 2-point window
+      // the floor can be 4 points away. Pin it to the edge with an arrow rather
+      // than dropping it, so "no line" always means "no line", not "off-screen".
+      if (raw < L.mainY0 || raw > L.mainY1) {
+        const above = raw < L.mainY0;
+        const y = above ? L.mainY0 + 8 : L.mainY1 - 8;
+        ctx.fillStyle = alpha(col, 0.9);
+        ctx.beginPath();
+        const ax = L.plotX0 + 14;
+        if (above) {
+          ctx.moveTo(ax, y - 7);
+          ctx.lineTo(ax - 5, y);
+          ctx.lineTo(ax + 5, y);
+        } else {
+          ctx.moveTo(ax, y + 7);
+          ctx.lineTo(ax - 5, y);
+          ctx.lineTo(ax + 5, y);
+        }
+        ctx.fill();
+        this.pill(L.plotX0 + 86, y, `${l.label} ${above ? "↑" : "↓"}`, col, above ? 1 : -1);
+        continue;
+      }
+      const y = Math.round(raw) + 0.5;
       const floor = l.kind === "daily-breach" || l.kind === "drawdown-breach";
       ctx.strokeStyle = alpha(col, floor ? 0.85 : 0.95);
       ctx.lineWidth = floor ? 1.5 : 1;

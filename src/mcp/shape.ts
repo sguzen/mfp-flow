@@ -53,8 +53,9 @@ export interface DataQuality {
   delta: string;
   tpo: string;
   real_volume_share_pct: number;
+  open_interest: string;
 }
-export function dataQuality(realShare: number, realSince: number | null): DataQuality {
+export function dataQuality(realShare: number, realSince: number | null, oi?: { live: boolean; history: string | null }): DataQuality {
   const pct = Math.round(realShare * 1000) / 10;
   return {
     volume_profile: `Volume is exact; the buy/sell split is real for ${pct}% of it and rebuilt from 1-minute candles for the rest.`,
@@ -63,7 +64,22 @@ export function dataQuality(realShare: number, realSince: number | null): DataQu
       : "No live trades recorded yet, so aggressor delta is unavailable for this window.",
     tpo: "TPO is time at price, rebuilt from 1-minute highs and lows, so it is exact for every past session.",
     real_volume_share_pct: pct,
+    open_interest: oi
+      ? oi.history
+        ? `Live OI from the MFP stream, backfilled from ${oi.history}. Sessions with no observation report null rather than zero.`
+        : "Live OI from the MFP stream only; this venue publishes no OI history, so earlier sessions may report null."
+      : "Open interest was not observed for this request.",
   };
+}
+
+export interface OiRow {
+  change_pct: number;
+  reading: string;
+}
+
+/** Null when OI was never observed for the session, so the agent is not told zero. */
+export function shapeOi(r: { deltaOiPct: number; label: string } | null): OiRow | null {
+  return r ? { change_pct: roundTo(r.deltaOiPct * 100, 3), reading: r.label } : null;
 }
 
 export interface SessionRow {
@@ -77,9 +93,15 @@ export interface SessionRow {
   volume: number;
   real_share_pct: number;
   value_vs_prior: string | null;
+  open_interest: OiRow | null;
 }
 
-export function shapeSessions(sessions: SessionStats[], row: number, px: Px): SessionRow[] {
+export function shapeSessions(
+  sessions: SessionStats[],
+  row: number,
+  px: Px,
+  oi: ({ deltaOiPct: number; label: string } | null)[] = [],
+): SessionRow[] {
   return sessions.map((s, i) => {
     const prior = i > 0 ? sessions[i - 1] : null;
     return {
@@ -93,6 +115,7 @@ export function shapeSessions(sessions: SessionStats[], row: number, px: Px): Se
       volume: Math.round(s.volume),
       real_share_pct: Math.round(s.realShare * 1000) / 10,
       value_vs_prior: s.va && prior?.va ? valueRelation(s.va, prior.va) : null,
+      open_interest: shapeOi(oi[i] ?? null),
     };
   });
 }

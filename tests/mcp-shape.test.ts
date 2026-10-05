@@ -3,7 +3,7 @@ import type { FailedAuction, NakedPoc } from "../src/analytics/auction";
 import { profileFromVolumes } from "../src/analytics/profile";
 import type { SessionStats } from "../src/analytics/series";
 import type { TpoProfile } from "../src/analytics/tpo";
-import { dataQuality, levelsSummary, priceStr, pxAt, relationPhrase, shapeFailed, shapeNaked, shapeSessions, shapeTpo } from "../src/mcp/shape";
+import { dataQuality, levelsSummary, priceStr, pxAt, relationPhrase, shapeFailed, shapeNaked, shapeOi, shapeSessions, shapeTpo } from "../src/mcp/shape";
 
 const U = 100_000_000; // one price unit (prices are integers at 1e-8)
 
@@ -225,5 +225,41 @@ describe("levelsSummary", () => {
     const s = levelsSummary({ market: "BTC", last: null, location: null, relation: null, naked: 1, failed: 1 });
     expect(s).toContain("1 naked POC ");
     expect(s).toContain("1 failed auction ");
+  });
+});
+
+describe("open interest in the MCP response", () => {
+  it("reports the change as a percentage and its reading", () => {
+    expect(shapeOi({ deltaOiPct: 0.0214, label: "new longs" })).toEqual({ change_pct: 2.14, reading: "new longs" });
+  });
+  it("keeps the sign on a fall", () => {
+    expect(shapeOi({ deltaOiPct: -0.012, label: "long liquidation" })!.change_pct).toBe(-1.2);
+  });
+  // an agent must not be told "0%" when the answer is "we did not look"
+  it("is null when OI was never observed", () => {
+    expect(shapeOi(null)).toBeNull();
+  });
+  it("rides along with each session, aligned by index", () => {
+    const a = session(Date.UTC(2026, 9, 4), 11, 10, 12);
+    const b = session(Date.UTC(2026, 9, 5), 13, 12, 14);
+    const rows = shapeSessions([a, b], ROW, px, [null, { deltaOiPct: 0.03, label: "new longs" }]);
+    expect(rows[0].open_interest).toBeNull();
+    expect(rows[1].open_interest).toEqual({ change_pct: 3, reading: "new longs" });
+  });
+  it("sessions with no OI series at all report null, not a crash", () => {
+    const rows = shapeSessions([session(Date.UTC(2026, 9, 4), 11, 10, 12)], ROW, px);
+    expect(rows[0].open_interest).toBeNull();
+  });
+});
+
+describe("data_quality names the OI source", () => {
+  it("says when history was backfilled", () => {
+    expect(dataQuality(1, null, { live: true, history: "Binance openInterestHist at 15m" }).open_interest).toContain("backfilled from Binance");
+  });
+  it("says plainly when the venue publishes none", () => {
+    expect(dataQuality(1, null, { live: true, history: null }).open_interest).toContain("no OI history");
+  });
+  it("says when OI was not looked at", () => {
+    expect(dataQuality(1, null).open_interest).toMatch(/not observed/);
   });
 });

@@ -13,6 +13,7 @@ import { z } from "zod";
 import { locationVsValue, valueRelation } from "../analytics/auction.js";
 import { decimalsFor } from "../analytics/price.js";
 import type { SessionMode } from "../analytics/session.js";
+import { binanceSymbol, fetchOiHistory } from "../data/binance-oi.js";
 import { ALIASES, defaultSession, isTradFi, loadMarkets, marketLabel, type Market } from "../data/markets.js";
 import { ChartModel, type ViewMode } from "../model.js";
 import { FeedPool } from "./feeds.js";
@@ -20,9 +21,11 @@ import {
   dataQuality,
   levelsSummary,
   pxAt,
+  relationPhrase,
   rowLo,
   shapeFailed,
   shapeNaked,
+  shapeOi,
   shapePoor,
   shapeSessions,
   shapeTpo,
@@ -71,6 +74,7 @@ function chooseRow(opts: number[], defaultUnits: number, view: ViewMode, want?: 
 interface Built {
   market: Market;
   model: ChartModel;
+  oiHistory: string | null;
   row: number;
   px: Px;
   last: number | null;
@@ -99,11 +103,23 @@ async function build(token: string, days: number, view: ViewMode, wantRow?: numb
     rightProfile: "composite",
     compositeDays: days,
   });
+  // Binance publishes OI history; MFP keeps none and Hyperliquid only exposes a
+  // current value, so those markets get live OI only and the response says so.
+  const sym = binanceSymbol(market);
+  let oiHistory: string | null = null;
+  if (sym) {
+    const h = await fetchOiHistory(sym, days);
+    if (h.history) {
+      feed.mergeOi(h.history.points.map((p) => ({ t: p.t, usd: p.usd })));
+      oiHistory = `Binance openInterestHist at ${h.history.period}`;
+    }
+  }
   model.build(src);
   const cur = model.sessions[model.sessions.length - 1];
   return {
     market,
     model,
+    oiHistory,
     row,
     px: pxAt(Math.max(decimalsFor(feed.tick || src.tick), 0)),
     last: feed.lastPrice,
@@ -155,7 +171,7 @@ server.registerTool(
   },
   async ({ market, days, row, session }) => {
     const b = await build(market, days, "profiles", row, session as SessionMode | undefined);
-    const sessions = shapeSessions(b.model.sessions, b.row, b.px);
+    const sessions = shapeSessions(b.model.sessions, b.row, b.px, b.model.oiSession);
     const cur = sessions[sessions.length - 1];
     return ok({
       market: { id: b.market.market_id, label: marketLabel(b.market), session: b.session },
@@ -163,9 +179,9 @@ server.registerTool(
       last_price: b.last != null ? b.px(b.last) : null,
       sessions,
       composite: b.model.composite ? { days: b.model.composite.days, ...vaOf(b.model.composite.va, b.row, b.px) } : null,
-      data_quality: dataQuality(b.realShare, b.realSince),
+      data_quality: dataQuality(b.realShare, b.realSince, { live: b.model.hasOi, history: b.oiHistory }),
       summary: cur
-        ? `${marketLabel(b.market)}: ${sessions.length} session(s). Today POC ${cur.poc}, value ${cur.val}-${cur.vah}, ${cur.value_vs_prior ?? "no prior"} than prior. Context, not signals.`
+        ? `${marketLabel(b.market)}: ${sessions.length} session(s). Today POC ${cur.poc}, value ${cur.val}-${cur.vah}, ${cur.value_vs_prior ? relationPhrase(cur.value_vs_prior) : "no prior session"}${cur.open_interest ? `, OI ${cur.open_interest.change_pct > 0 ? "+" : ""}${cur.open_interest.change_pct}% (${cur.open_interest.reading})` : ""}. Context, not signals.`
         : "No sessions in range.",
     });
   },
@@ -232,7 +248,8 @@ server.registerTool(
       naked_pocs: naked,
       poor_extremes: shapePoor(b.model.ctx.poor, b.row, b.px),
       failed_auctions: failed,
-      data_quality: dataQuality(b.realShare, b.realSince),
+      open_interest: shapeOi(b.model.oiSession[b.model.oiSession.length - 1] ?? null),
+      data_quality: dataQuality(b.realShare, b.realSince, { live: b.model.hasOi, history: b.oiHistory }),
       summary: levelsSummary({
         market: marketLabel(b.market),
         last: b.last != null ? b.px(b.last) : null,

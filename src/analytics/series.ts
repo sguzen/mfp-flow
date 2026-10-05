@@ -52,7 +52,7 @@ function foldMinute(acc: Acc, src: MinuteSource, m: number, rowUnits: number): v
   const cd = src.candles.get(m);
   const real = src.isReal(m);
   if (!fp && !cd) return;
-  if (!fp && real) return; // fully covered, no trades: genuinely zero volume
+  if (!fp && real && !(cd && cd.v > 0)) return; // fully covered, no trades: genuinely zero volume
   let o: number, h: number, l: number, c: number;
   let estVol = 0;
   if (fp) {

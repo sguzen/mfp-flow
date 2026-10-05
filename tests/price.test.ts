@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bucketOf, chooseBuckets, decimalsFor, fineUnitsFor, floorDiv, formatUnits, inferTick, niceCeil, parseUnits } from "../src/analytics/price";
+import { bucketOf, chooseBuckets, decimalsFor, fineUnitsFor, floorDiv, formatUnits, inferTick, niceCeil, parseUnits, pow10Divisor } from "../src/analytics/price";
 
 describe("parseUnits (decimal strings -> integer 1e-8 units)", () => {
   it("parses exactly", () => {
@@ -58,11 +58,15 @@ describe("row size defaults", () => {
     expect(niceCeil(2.1)).toBe(2.5);
     expect(niceCeil(2)).toBe(2);
   });
-  it("fine storage granularity", () => {
-    expect(fineUnitsFor(parseUnits("86000"))).toBe(parseUnits("0.01"));
-    expect(fineUnitsFor(parseUnits("30775"))).toBe(parseUnits("0.01"));
-    expect(fineUnitsFor(parseUnits("4154"))).toBe(parseUnits("0.001"));
-    expect(fineUnitsFor(parseUnits("0.0123"))).toBe(1);
+  it("fine storage granularity (≈0.1bp, never finer than the tick's power of ten)", () => {
+    expect(fineUnitsFor(parseUnits("86000"), parseUnits("0.1"))).toBe(parseUnits("0.1"));
+    expect(fineUnitsFor(parseUnits("30775"), parseUnits("1"))).toBe(parseUnits("1"));
+    expect(fineUnitsFor(parseUnits("30775"), parseUnits("0.1"))).toBe(parseUnits("0.1"));
+    expect(fineUnitsFor(parseUnits("4154"), parseUnits("0.1"))).toBe(parseUnits("0.1"));
+    expect(fineUnitsFor(parseUnits("4154"), parseUnits("0.01"))).toBe(parseUnits("0.01"));
+    expect(fineUnitsFor(parseUnits("0.0123"), 1)).toBe(parseUnits("0.0000001"));
+    expect(pow10Divisor(parseUnits("0.5"))).toBe(parseUnits("0.1"));
+    expect(pow10Divisor(parseUnits("25"))).toBe(parseUnits("1"));
   });
   it("per-market defaults ≈ 1bp, nice, multiple of tick", () => {
     expect(chooseBuckets(parseUnits("86163.9"), parseUnits("0.1")).defaultUnits).toBe(parseUnits("10"));

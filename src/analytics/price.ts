@@ -101,17 +101,29 @@ export function niceCeil(x: number): number {
 }
 
 /**
- * Storage granularity for live footprints: a power of ten at least 10x finer
- * than the smallest selectable row size, so every selectable row size
- * (1, 2, 2.5, 5 × 10^k) is an exact integer multiple of it.
- * BTC ~86k → 0.01, NAS100 ~30.8k → 0.01, GOLD ~4.15k → 0.001.
+ * Storage granularity for live footprints: a power of ten ≈ 0.1 bp of price,
+ * but never finer than the largest power of ten dividing the market tick.
+ * Every selectable row size is an integer multiple of it, and nested floor
+ * division keeps re-bucketing exact: floor(floor(p/f)/(r/f)) = floor(p/r).
+ * BTC ~86k (tick 0.1) → 0.1, NAS100 ~30.8k (tick 1) → 1, GOLD ~4.15k (tick 0.1) → 0.1.
  */
-export function fineUnitsFor(refPriceUnits: number): number {
+export function fineUnitsFor(refPriceUnits: number, tickUnits = 1): number {
   const ref = unitsToNumber(Math.abs(refPriceUnits));
-  if (!(ref > 0)) return 1;
-  const e = Math.floor(Math.log10(ref * 1e-5)) - 1;
-  const u = Math.round(Math.pow(10, e) * PRICE_SCALE);
-  return Math.max(1, u);
+  let u = 1;
+  if (ref > 0) {
+    const e = Math.floor(Math.log10(ref * 1e-5));
+    u = Math.max(1, Math.round(Math.pow(10, e) * PRICE_SCALE));
+  }
+  return Math.max(u, pow10Divisor(tickUnits));
+}
+
+/** Largest power of ten (in units) dividing `units`. */
+export function pow10Divisor(units: number): number {
+  let p = 1;
+  const a = Math.abs(Math.round(units));
+  if (a === 0) return 1;
+  while (a % (p * 10) === 0 && p < PRICE_SCALE * 1e6) p *= 10;
+  return p;
 }
 
 export interface BucketChoice {
@@ -131,7 +143,7 @@ export interface BucketChoice {
  */
 export function chooseBuckets(refPriceUnits: number, tickUnits: number): BucketChoice {
   const tick = Math.max(1, Math.round(tickUnits));
-  const fine = fineUnitsFor(refPriceUnits);
+  const fine = fineUnitsFor(refPriceUnits, tick);
   const ref = unitsToNumber(refPriceUnits);
   let def = Math.round(niceCeil(ref * 1e-4) * PRICE_SCALE);
   const lo = def / 10;

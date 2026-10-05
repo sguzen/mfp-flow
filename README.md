@@ -93,6 +93,8 @@ npm install && npm run ext:build     # builds dist-ext/
 npm run ext:zip                      # mfp-flow-extension.zip, for distribution
 ```
 
+![The panel inside the MFP terminal, with the account's own levels on the chart](docs/screenshots/extension-overlay.png)
+
 On a `/trade/...` page a **mfp·flow** button opens a resizable panel. It follows the
 terminal's market as you switch instruments, mapping the terminal's tickers onto the
 stream's (the terminal says XAU where the stream says GOLD, and some of its TradFi

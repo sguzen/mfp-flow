@@ -87,10 +87,23 @@ Every response carries a `data_quality` block saying what is exact and what is i
 A Manifest V3 extension puts the same chart beside the MyFundedPerps terminal,
 and — if you give it a **Read Only** API key — draws your own account's levels on it.
 
+**To try it without building anything**, download `mfp-flow-extension.zip` from the
+[latest release](https://github.com/sguzen/mfp-flow/releases/latest) and unzip it. Then open
+`chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and select the
+unzipped `mfp-flow-extension` folder. Chrome will note that it is an unpacked extension —
+expected, since this is not on the Chrome Web Store. The release zip is built by CI from
+the tagged source rather than uploaded from a laptop.
+
+**A key is optional.** The chart works with no account at all; a **Read Only** key is only
+needed for the account overlay, and a `fp_test_…` key reaches sandbox accounts only, which
+is the one to test with.
+
+To build it yourself instead:
+
 ```bash
 npm install && npm run ext:build     # builds dist-ext/
 # chrome://extensions -> Developer mode -> Load unpacked -> select dist-ext/
-npm run ext:zip                      # mfp-flow-extension.zip, for distribution
+npm run ext:zip                      # mfp-flow-extension.zip, same layout as the release
 ```
 
 ![The panel inside the MFP terminal, with the account's own levels on the chart](docs/screenshots/extension-overlay.png)

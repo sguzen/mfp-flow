@@ -12,12 +12,15 @@
     "markets": "tsx scripts/markets.ts",
     "mcp:dev": "tsx src/mcp/server.ts",
     "mcp:build": "esbuild src/mcp/server.ts --bundle --platform=node --target=node22 --format=esm --packages=external --outfile=dist-mcp/mfp-flow-mcp.js && chmod +x dist-mcp/mfp-flow-mcp.js",
-    "mcp:smoke": "npm run mcp:build && tsx scripts/mcp-smoke.ts"
+    "mcp:smoke": "npm run mcp:build && tsx scripts/mcp-smoke.ts",
+    "ext:build": "vite build --config vite.ext.config.ts && esbuild extension/background.ts --bundle --format=esm --target=chrome120 --outfile=dist-ext/background.js && esbuild extension/content.ts --bundle --format=iife --target=chrome120 --outfile=dist-ext/content.js && cp extension/manifest.json dist-ext/manifest.json",
+    "ext:zip": "cd dist-ext && zip -qr ../mfp-flow-extension.zip . && cd .. && ls -la mfp-flow-extension.zip"
   },
   "keywords": [],
   "author": "SiS",
   "license": "MIT",
   "devDependencies": {
+    "@types/chrome": "^0.3.4",
     "@types/node": "^26.6.4",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.15",

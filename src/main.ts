@@ -11,6 +11,8 @@ import { MarketFeed, type FeedChange } from "./data/feed";
 import { DEFAULT_MARKET_ID, defaultSession, isTradFi, loadMarkets, marketLabel, type Market } from "./data/markets";
 import { loadMinutes, saveMinutes } from "./data/persist";
 import { MarketStream } from "./data/stream";
+import { parseEmbed, isMarketMessage } from "./ext/embed";
+import { matchMarket } from "./ext/market-from-url";
 import { HELP } from "./help";
 import { parseLink, serializeLink, type LinkState } from "./link";
 import { ChartModel, type ViewMode } from "./model";
@@ -76,7 +78,12 @@ const ui = loadUi();
 /** per-market link parts, consumed by the first selectMarket() */
 let pendingLink: LinkState | null = null;
 const bootLink = parseLink(location.hash);
-applyLink(bootLink);
+/** Set when running as the in-terminal panel (see src/ext/embed.ts). */
+const embed = parseEmbed(location.hash);
+if (embed.embed) {
+  document.documentElement.classList.add("embed");
+  ui.panel = false;
+} else applyLink(bootLink);
 
 // ---------- deep links ----------
 // The hash carries the whole view (see src/link.ts). Anything it specifies wins
@@ -461,6 +468,13 @@ window.addEventListener("hashchange", () => {
   if ((id && id !== market?.market_id) || pendingLink) void selectMarket(id ?? market?.market_id ?? ui.market);
   else schedule();
 });
+/** A one-line warning over the chart, used by the in-terminal panel. */
+function embedNote(msg: string | null) {
+  const el = $<HTMLDivElement>("embedNote");
+  el.textContent = msg ?? "";
+  el.hidden = !msg;
+}
+
 // ---------- view explainer ----------
 // Shown once per view, the first time it is opened. Storage is best effort:
 // a blocked localStorage just means the hint shows again, never a broken app.
@@ -614,6 +628,16 @@ $("snapLink").addEventListener("click", async () => {
     // last resort: put it somewhere the user can copy by hand
     window.prompt("Copy this link:", url);
   }
+});
+
+// The panel runs as an iframe on a third-party page, so treat every message as
+// untrusted: only a well-formed market switch from our own content script is
+// acted on, and it can only change which market is charted.
+window.addEventListener("message", (e) => {
+  if (!embed.embed || !isMarketMessage(e.data)) return;
+  const m = matchMarket({ symbol: e.data.symbol ?? "", tradfi: e.data.tradfi }, markets);
+  embedNote(e.data.symbol && !m ? `No stream market for “${e.data.symbol}” — pick one above.` : null);
+  if (m && m.market_id !== market?.market_id) void selectMarket(m.market_id);
 });
 
 window.addEventListener("pagehide", () => void feed?.flushPersist());
@@ -787,7 +811,11 @@ async function boot() {
     `<optgroup label="Featured">${featured.map(opt).join("")}</optgroup>` +
     `<optgroup label="Indices, metals, stocks & FX">${tradfi.map(opt).join("")}</optgroup>` +
     `<optgroup label="Crypto">${crypto.map(opt).join("")}</optgroup>`;
-  await selectMarket(marketFromToken(markets, bootLink.market) ?? ui.market);
+  const fromHost = embed.embed ? matchMarket({ symbol: embed.symbol ?? "", tradfi: embed.tradfi }, markets) : null;
+  await selectMarket(fromHost?.market_id ?? marketFromToken(markets, bootLink.market) ?? ui.market);
+  // the terminal may be on something the stream does not carry: say so rather
+  // than silently charting whatever was loaded last
+  embedNote(embed.embed && embed.symbol && !fromHost ? `No stream market for “${embed.symbol}” — pick one above.` : null);
   helpOnView(ui.view);
 }
 

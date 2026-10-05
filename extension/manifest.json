@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "mfp·flow",
+  "version": "0.1.0",
+  "description": "Footprint, volume profile and TPO beside the MyFundedPerps terminal, with your account's own risk lines on the chart. Read-only.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://developers.myfundedperpetuals.com/*",
+    "https://sandbox.myfundedperpetuals.com/*"
+  ],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "options_page": "options.html",
+  "action": { "default_title": "mfp·flow — open the panel on a trade page" },
+  "content_scripts": [
+    {
+      "matches": ["https://myfundedperpetuals.com/trade/*", "https://*.myfundedperpetuals.com/trade/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["panel.html", "assets/*"],
+      "matches": ["https://myfundedperpetuals.com/*", "https://*.myfundedperpetuals.com/*"]
+    }
+  ]
+}

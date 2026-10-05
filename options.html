@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <title>mfp·flow — settings</title>
+    <link rel="stylesheet" href="./extension/options.css" />
+  </head>
+  <body>
+    <main>
+      <h1>mfp<span>·</span>flow</h1>
+      <p class="lead">
+        Shows your account's risk lines on the chart beside the MyFundedPerps terminal.
+        <strong>Read-only:</strong> this extension never places, changes or cancels an order.
+      </p>
+
+      <section>
+        <h2>API key</h2>
+        <p class="hint">
+          Use a <strong>Read Only</strong> key. A <code>fp_test_…</code> key reaches sandbox accounts only;
+          a <code>fp_live_…</code> key reaches your real challenge accounts. The key is stored in this
+          browser's extension storage, is never synced to other browsers, and is never given to the page
+          or to the panel — only this background worker reads it.
+        </p>
+        <div class="row">
+          <input id="key" type="password" placeholder="fp_test_… or fp_live_…" autocomplete="off" spellcheck="false" />
+          <button id="save">Save</button>
+          <button id="forget" class="ghost">Forget key</button>
+        </div>
+        <p id="keyState" class="state"></p>
+      </section>
+
+      <section>
+        <h2>Checks</h2>
+        <div class="row">
+          <button id="probe">Test REST access</button>
+          <button id="accounts">List accounts</button>
+        </div>
+        <p id="probeState" class="state"></p>
+        <pre id="out" hidden></pre>
+      </section>
+    </main>
+    <script type="module" src="./extension/options.ts"></script>
+  </body>
+</html>

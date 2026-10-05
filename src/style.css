@@ -250,3 +250,15 @@ body.panel-hidden .panel { display: none; }
   border: 1px solid var(--c-border); color: var(--c-text);
 }
 .help-foot button:hover { border-color: var(--c-faint); }
+
+/* ---------- in-terminal panel (extension) ---------- */
+.embed-note {
+  position: absolute; z-index: 25; top: 8px; left: 50%; transform: translateX(-50%);
+  max-width: calc(100% - 24px); padding: 6px 12px; border-radius: 999px;
+  background: var(--c-panel); border: 1px solid var(--c-sell); color: var(--c-text);
+  font-size: 12px; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+}
+.embed-note[hidden] { display: none; }
+/* the panel is narrow: drop the tagline and tighten the header */
+.embed .brand .tagline { display: none; }
+.embed .bar { gap: 6px; padding: 5px 8px; }

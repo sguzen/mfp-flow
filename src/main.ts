@@ -10,6 +10,7 @@ import type { SessionMode } from "./analytics/session";
 import { MarketFeed, type FeedChange } from "./data/feed";
 import { DEFAULT_MARKET_ID, defaultSession, isTradFi, loadMarkets, marketLabel, type Market } from "./data/markets";
 import { loadMinutes, saveMinutes } from "./data/persist";
+import { fetchRecorder, mergeRestored } from "./data/recorder";
 import { MarketStream } from "./data/stream";
 import { allowanceShare, getAccountState, getAccounts, getQuote, inExtension, keyStatus, type AccountSummary } from "./ext/account";
 import { parseEmbed, isMarketMessage } from "./ext/embed";
@@ -40,6 +41,8 @@ interface UiSettings {
   imb: number;
   va: number;
   tz: TimeZoneMode;
+  /** optional recorder service base URL (see recorder/) */
+  recorderUrl: string;
   theme: "dark" | "light";
   panel: boolean;
 }
@@ -58,6 +61,7 @@ const defaults: UiSettings = {
   imb: 3,
   va: 0.7,
   tz: "local",
+  recorderUrl: "",
   theme: "dark",
   panel: true,
 };
@@ -86,7 +90,6 @@ const bootLink = parseLink(location.hash);
 const embed = parseEmbed(location.hash);
 if (embed.embed) {
   document.documentElement.classList.add("embed");
-  ui.panel = false;
   // tell the host page we actually loaded; a blocked iframe never gets here
   try {
     parent?.postMessage({ source: "mfp-flow", type: "ready" }, "*");
@@ -177,7 +180,9 @@ const elPanel = $<HTMLElement>("panel");
 const host = $<HTMLElement>("chart");
 
 document.documentElement.dataset.theme = ui.theme;
-document.body.classList.toggle("panel-hidden", !ui.panel);
+/** Panel visibility is a view state; embed starts collapsed without saving that. */
+let panelOpen = embed.embed ? false : ui.panel;
+document.body.classList.toggle("panel-hidden", !panelOpen);
 
 const chart = new FootprintChart(host);
 const empty = document.createElement("div");
@@ -189,6 +194,7 @@ stream.connect();
 
 let markets: Market[] = [];
 let marketsNote: string | undefined;
+let recorderNote: string | null = null;
 let feed: MarketFeed | null = null;
 let market: Market | null = null;
 
@@ -344,7 +350,16 @@ async function selectMarket(id: string) {
     priorSessions: Math.max(1, ui.days - 1),
     session: { mode: sessionModeFor(m) },
     persist: {
-      load: (mid, fine, since) => loadMinutes(mid, fine, since),
+      // the browser's own recording first, then anything a recorder service has
+      // for the same window; both are real trades, so they merge before the
+      // feed falls back to estimating from candles
+      load: async (mid, fine, since) => {
+        const local = await loadMinutes(mid, fine, since);
+        if (!ui.recorderUrl) return local;
+        const got = await fetchRecorder(ui.recorderUrl, mid, fine, since);
+        recorderNote = got.note;
+        return mergeRestored(local, got.restored);
+      },
       save: (mid, fine, minutes, segments) => saveMinutes(mid, fine, minutes, segments),
     },
     onChange: (k) => {
@@ -448,6 +463,16 @@ elVa.addEventListener("change", () => {
   saveUi();
   schedule();
 });
+const elRecorder = $<HTMLInputElement>("optRecorder");
+elRecorder.value = ui.recorderUrl;
+elRecorder.addEventListener("change", () => {
+  ui.recorderUrl = elRecorder.value.trim();
+  recorderNote = null;
+  saveUi();
+  // the recorder is only read while a feed starts, so reload this market
+  if (market) void selectMarket(market.market_id);
+});
+
 elTz.value = ui.tz;
 elTz.addEventListener("change", () => {
   ui.tz = elTz.value as TimeZoneMode;
@@ -461,9 +486,14 @@ $("theme").addEventListener("click", () => {
   chart.refreshTheme();
 });
 $("panelToggle").addEventListener("click", () => {
-  ui.panel = !ui.panel;
-  document.body.classList.toggle("panel-hidden", !ui.panel);
-  saveUi();
+  panelOpen = !panelOpen;
+  document.body.classList.toggle("panel-hidden", !panelOpen);
+  // only the standalone app owns this preference
+  if (!embed.embed) {
+    ui.panel = panelOpen;
+    saveUi();
+  }
+  renderPanel();
 });
 document.addEventListener("click", (e) => {
   const d = $<HTMLDetailsElement>("opts");
@@ -775,7 +805,7 @@ window.addEventListener("pagehide", () => void feed?.flushPersist());
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 function renderPanel() {
-  if (!ui.panel) return;
+  if (!panelOpen) return;
   const f = feed;
   const m = market;
   if (!f || !m) {
@@ -795,6 +825,7 @@ function renderPanel() {
   const parts: string[] = [];
 
   if (marketsNote && markets.length && f.history.state !== "done" && !model.bars.length) parts.push(`<div class="banner">${esc(marketsNote)}</div>`);
+  if (recorderNote) parts.push(`<p class="note">Recorder: ${esc(recorderNote)}</p>`);
 
   // --- session
   parts.push(`<h2>Current session <span class="tag">${esc(sessionModeFor(m) === "ny18" ? "18:00 ET" : "UTC day")}</span></h2>`);

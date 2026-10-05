@@ -138,6 +138,38 @@ lands a little short of the floor — about $0.037 on that position. That cushio
 reported by `exitCost()` rather than folded into the line, so the line keeps meaning
 the same thing the platform's does.
 
+## Optional: the 24/7 recorder
+
+The trade stream is live-only, so the browser can only show real aggressor delta from the
+moment you opened the page. A machine that stays on can record continuously, and the app
+merges those minutes as **real** instead of estimating them from candles.
+
+```bash
+MFP_MARKETS="binance|BTCUSDT,hyperliquid|xyz:XYZ100" npm run recorder
+# -> http://127.0.0.1:8787  (/minutes, /health)
+```
+
+Then paste that URL into **Display -> Recorder URL** in the app. Minutes it has are merged
+in as real before the candle fallback; where both the browser and the recorder saw the same
+minute, the one with more trades wins.
+
+| Env var | Default | |
+| - | - | - |
+| `MFP_MARKETS` | BTCUSDT + XYZ100 | comma-separated market ids |
+| `MFP_PORT` / `MFP_HOST` | `8787` / `127.0.0.1` | loopback by default |
+| `MFP_DB` | `recorder.db` | SQLite file (`node:sqlite`, no native build) |
+| `MFP_RETENTION_DAYS` | `14` | older minutes are pruned |
+
+It runs the same `MarketFeed` the browser runs, with SQLite behind the app's own
+`Persistence` interface, so there is no second implementation of the footprint, the
+tradeId dedupe or the coverage tracking. It is read-only and keyless (public market data
+only), which is why `/minutes` serves open CORS.
+
+**Hosting is yours to arrange.** An always-on desktop or a small VPS both work. If you
+expose it beyond loopback, put it behind something that terminates TLS, and note that
+`/minutes` is readable by anyone who can reach it -- it carries no account data, only
+public trades. Nothing is hosted on your behalf.
+
 ## How it uses MFP
 
 - `wss://api-stream.myfundedperpetuals.com/v1/market-data`. One multiplexed connection carries `trades`, `marketStats` (mark, OI, funding) and live `candles`. It also uses `candles.history` paging for backfill, reconnects with backoff and jitter, resubscribes, replaces itself on `draining`, and backfills gaps after reconnects.

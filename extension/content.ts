@@ -30,11 +30,19 @@ function panelUrl(): string {
 let root: HTMLDivElement | null = null;
 let frame: HTMLIFrameElement | null = null;
 
+/** The host page's storage can be blocked or partitioned; a width is not worth failing over. */
+function savedWidth(): number {
+  try {
+    return Number(localStorage.getItem(STORE_W) ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
 function build(): HTMLDivElement {
   const el = document.createElement("div");
   el.id = PANEL_ID;
-  const saved = Number(localStorage.getItem(STORE_W) ?? 0);
-  const width = Math.min(MAX_W, Math.max(MIN_W, saved || 460));
+  const width = Math.min(MAX_W, Math.max(MIN_W, savedWidth() || 460));
   el.style.cssText = `position:fixed;top:0;right:0;height:100vh;width:${width}px;z-index:2147483000;display:flex;background:#0b0e11;border-left:1px solid #232c38;box-shadow:-12px 0 32px rgba(0,0,0,.45)`;
 
   const grip = document.createElement("div");
@@ -73,16 +81,54 @@ function build(): HTMLDivElement {
   return el;
 }
 
-function toggle() {
-  if (root) {
-    root.remove();
-    root = null;
-    frame = null;
-    return;
-  }
-  root = build();
-  document.body.appendChild(root);
+/** Last-resort visible feedback: a silent failure is the worst outcome here. */
+function complain(msg: string) {
+  const b = document.getElementById("mfp-flow-toggle");
+  if (!b) return;
+  b.textContent = msg;
+  b.setAttribute("style", `${b.getAttribute("style") ?? ""};border-color:#e5484d;color:#e5484d`);
 }
+
+function openInTab() {
+  window.open(panelUrl(), "_blank", "noopener,width=520,height=900");
+}
+
+let readyTimer = 0;
+function toggle() {
+  try {
+    if (root) {
+      root.remove();
+      root = null;
+      frame = null;
+      clearTimeout(readyTimer);
+      return;
+    }
+    root = build();
+    document.body.appendChild(root);
+    // A site's frame-src policy can refuse a chrome-extension: iframe. The panel
+    // posts "ready" once it loads; if that never arrives, say so and offer a tab.
+    clearTimeout(readyTimer);
+    readyTimer = window.setTimeout(() => {
+      if (!panelReady) {
+        complain("mfp·flow — open in tab");
+        const b = document.getElementById("mfp-flow-toggle");
+        b?.addEventListener("click", openInTab, { once: true });
+      }
+    }, 4000);
+  } catch (e) {
+    complain("mfp·flow — failed");
+    console.error("[mfp-flow] could not open the panel:", e);
+  }
+}
+
+let panelReady = false;
+window.addEventListener("message", (e) => {
+  const d = e.data as { source?: string; type?: string } | null;
+  if (d?.source === "mfp-flow" && d.type === "ready") {
+    panelReady = true;
+    clearTimeout(readyTimer);
+  }
+});
 
 function addButton() {
   if (document.getElementById("mfp-flow-toggle")) return;

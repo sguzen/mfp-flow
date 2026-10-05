@@ -87,6 +87,12 @@ const embed = parseEmbed(location.hash);
 if (embed.embed) {
   document.documentElement.classList.add("embed");
   ui.panel = false;
+  // tell the host page we actually loaded; a blocked iframe never gets here
+  try {
+    parent?.postMessage({ source: "mfp-flow", type: "ready" }, "*");
+  } catch {
+    /* no parent, or a cross-origin parent that refuses */
+  }
 } else applyLink(bootLink);
 
 // ---------- deep links ----------

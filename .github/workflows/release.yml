@@ -1,0 +1,48 @@
+name: Release the extension
+
+# Tag a commit (v0.1.0) and this publishes a tester-ready zip. Built here rather
+# than uploaded from a laptop, so what people download is reproducible from the
+# tagged source.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # never ship a build whose tests did not pass
+      - run: npm test
+      - run: npm run ext:build
+      - name: Package
+        run: |
+          mkdir -p .pack/mfp-flow-extension
+          cp -r dist-ext/. .pack/mfp-flow-extension/
+          (cd .pack && zip -qr ../mfp-flow-extension.zip mfp-flow-extension)
+          unzip -l mfp-flow-extension.zip
+      - name: Check the build carries no key material
+        run: |
+          if grep -rEq 'fp_(test|live)_[A-Za-z0-9]' dist-ext/; then
+            echo "::error::an API key is present in the build"; exit 1
+          fi
+          if grep -rEo 'method\s*:\s*"(POST|PUT|PATCH|DELETE)"' dist-ext/*.js; then
+            echo "::error::the extension is meant to be read-only"; exit 1
+          fi
+          echo "clean: no key material, no write methods"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" mfp-flow-extension.zip \
+            --title "mfp·flow ${GITHUB_REF_NAME}" \
+            --notes-file .github/release-notes.md

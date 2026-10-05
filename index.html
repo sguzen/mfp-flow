@@ -12,7 +12,7 @@
   </head>
   <body>
     <header class="bar">
-      <div class="brand"><span class="logo" aria-hidden="true"></span>mfp<span class="dot">·</span>flow</div>
+      <div class="brand"><span class="logo" aria-hidden="true"></span>mfp<span class="dot">·</span>flow<span class="tagline">Context, not signals.</span></div>
 
       <div class="ctrl market">
         <label for="market" class="sr">Market</label>
@@ -22,6 +22,7 @@
       <div class="seg" id="view" role="radiogroup" aria-label="Chart view">
         <button data-v="footprint">Footprint</button><button data-v="profiles">Profiles</button><button data-v="tpo">TPO</button>
       </div>
+      <button class="icon" id="help" title="What am I looking at?" aria-label="Explain this view">?</button>
 
       <div class="seg" id="tf" role="radiogroup" aria-label="Bar interval">
         <button data-v="1">1m</button><button data-v="5">5m</button><button data-v="15">15m</button><button data-v="30">30m</button>
@@ -85,7 +86,16 @@
     </header>
 
     <main class="wrap">
-      <section class="chart-host" id="chart" aria-label="Footprint chart"></section>
+      <section class="chart-host" id="chart" aria-label="Footprint chart">
+        <div class="help-pop" id="helpPop" role="dialog" aria-labelledby="helpTitle" hidden>
+          <h3 id="helpTitle"></h3>
+          <ul id="helpList"></ul>
+          <div class="help-foot">
+            <span class="help-tag">Context, not signals.</span>
+            <button type="button" id="helpGot">Got it</button>
+          </div>
+        </div>
+      </section>
       <aside class="panel" id="panel" aria-label="Session context"></aside>
     </main>
   </body>

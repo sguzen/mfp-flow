@@ -11,6 +11,7 @@ import { MarketFeed, type FeedChange } from "./data/feed";
 import { DEFAULT_MARKET_ID, defaultSession, isTradFi, loadMarkets, marketLabel, type Market } from "./data/markets";
 import { loadMinutes, saveMinutes } from "./data/persist";
 import { MarketStream } from "./data/stream";
+import { HELP } from "./help";
 import { parseLink, serializeLink, type LinkState } from "./link";
 import { ChartModel, type ViewMode } from "./model";
 import { FootprintChart } from "./render/chart";
@@ -364,6 +365,7 @@ function defaultBarW(): number {
 function setView(v: ViewMode) {
   ui.view = v;
   saveUi();
+  helpOnView(v);
   for (const b of elView.querySelectorAll("button")) {
     b.setAttribute("role", "radio");
     b.setAttribute("aria-checked", String(b.dataset.v === v));
@@ -459,6 +461,68 @@ window.addEventListener("hashchange", () => {
   if ((id && id !== market?.market_id) || pendingLink) void selectMarket(id ?? market?.market_id ?? ui.market);
   else schedule();
 });
+// ---------- view explainer ----------
+// Shown once per view, the first time it is opened. Storage is best effort:
+// a blocked localStorage just means the hint shows again, never a broken app.
+const HELP_KEY = "mfp-flow:help-seen:v1";
+const elHelpPop = $<HTMLDivElement>("helpPop");
+
+function helpSeen(): Set<string> {
+  try {
+    const raw = localStorage.getItem(HELP_KEY);
+    if (raw) return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    /* storage blocked */
+  }
+  return new Set();
+}
+function markHelpSeen(v: ViewMode) {
+  try {
+    const seen = helpSeen();
+    seen.add(v);
+    localStorage.setItem(HELP_KEY, JSON.stringify([...seen]));
+  } catch {
+    /* ignore */
+  }
+}
+// A view button opens the hint, and that same click then bubbles to the
+// outside-click handler below. Ignore the click that did the opening.
+let helpJustOpened = false;
+function showHelp(v: ViewMode) {
+  const h = HELP[v];
+  $("helpTitle").textContent = h.title;
+  $("helpList").innerHTML = h.bullets.map((b) => `<li>${esc(b)}</li>`).join("");
+  elHelpPop.hidden = false;
+  helpJustOpened = true;
+  setTimeout(() => {
+    helpJustOpened = false;
+  }, 0);
+}
+function hideHelp() {
+  elHelpPop.hidden = true;
+}
+/** First time this view is opened, explain it. */
+function helpOnView(v: ViewMode) {
+  if (helpSeen().has(v)) return;
+  markHelpSeen(v);
+  showHelp(v);
+}
+$("help").addEventListener("click", () => {
+  if (elHelpPop.hidden) {
+    markHelpSeen(ui.view);
+    showHelp(ui.view);
+  } else hideHelp();
+});
+$("helpGot").addEventListener("click", hideHelp);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !elHelpPop.hidden) hideHelp();
+});
+document.addEventListener("click", (e) => {
+  if (elHelpPop.hidden || helpJustOpened) return;
+  const t = e.target as Node;
+  if (!elHelpPop.contains(t) && t !== $("help") && !$("help").contains(t)) hideHelp();
+});
+
 // ---------- share ----------
 const elShareNote = $<HTMLParagraphElement>("shareNote");
 let noteTimer = 0;
@@ -724,6 +788,7 @@ async function boot() {
     `<optgroup label="Indices, metals, stocks & FX">${tradfi.map(opt).join("")}</optgroup>` +
     `<optgroup label="Crypto">${crypto.map(opt).join("")}</optgroup>`;
   await selectMarket(marketFromToken(markets, bootLink.market) ?? ui.market);
+  helpOnView(ui.view);
 }
 
 // periodic repaint so the "now" edge and clocks move even when quiet

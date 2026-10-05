@@ -225,3 +225,28 @@ body.panel-hidden .panel { display: none; }
 .sess td { padding: 4px 4px 4px 0; border-top: 1px solid var(--c-border); vertical-align: top; font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 .sess td:first-child { font-family: inherit; color: var(--c-dim); white-space: nowrap; }
 .sess td:last-child { color: var(--c-dim); font-family: inherit; }
+
+/* ---------- view explainer ---------- */
+.brand .tagline {
+  margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--c-border);
+  color: var(--c-dim); font-size: 11px; font-weight: 400; letter-spacing: 0;
+}
+@media (max-width: 900px) { .brand .tagline { display: none; } }
+
+.chart-host { position: relative; }
+.help-pop {
+  position: absolute; z-index: 30; top: 12px; left: 12px; width: min(380px, calc(100% - 24px));
+  background: var(--c-panel); border: 1px solid var(--c-border); border-radius: 10px;
+  padding: 12px 14px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+.help-pop[hidden] { display: none; }
+.help-pop h3 { margin: 0 0 8px; font-size: 13px; }
+.help-pop ul { margin: 0; padding-left: 16px; display: grid; gap: 6px; }
+.help-pop li { font-size: 12px; line-height: 1.45; color: var(--c-text); }
+.help-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 11px; }
+.help-tag { color: var(--c-dim); font-size: 11px; }
+.help-foot button {
+  padding: 5px 12px; border-radius: 6px; background: var(--c-bg);
+  border: 1px solid var(--c-border); color: var(--c-text);
+}
+.help-foot button:hover { border-color: var(--c-faint); }

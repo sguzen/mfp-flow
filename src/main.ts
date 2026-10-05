@@ -507,6 +507,12 @@ function untilReset(now: number): string {
 
 async function initAccounts() {
   if (!embed.embed || !inExtension()) return;
+  // panel.html is generated from index.html, but say so plainly if that ever
+  // slips again rather than throwing on a null element
+  if (!elAcctCtrl || !elAcct || !elAcctStrip) {
+    embedNote("Account UI missing from this build of the panel.");
+    return;
+  }
   try {
     const st = await keyStatus();
     if (!st.present) return;

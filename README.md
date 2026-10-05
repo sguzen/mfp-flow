@@ -53,6 +53,7 @@ npm run smoke      # 20 s against the live stream: trade counts, dedupe, trade-v
 npm run build      # static site in dist/, deployable to any static host (relative paths)
 npm run markets    # refresh the bundled market list
 npm run mcp:smoke  # build the MCP server and exercise every tool against live data
+npm run ext:build  # the browser extension, into dist-ext/ (load unpacked in Chrome)
 ```
 
 ## Ask it questions: the MCP server
@@ -80,6 +81,52 @@ Try:
 - *"Compare where gold is trading against its last five days of value areas."*
 
 Every response carries a `data_quality` block saying what is exact and what is inferred: TPO is exact for any past session, volume is exact but its buy/sell split is only real for the share recorded live, and aggressor delta exists only from the moment the server started. Prices come back as decimal strings at the market's tick, and a short `summary` line is included so an agent can quote one sentence without re-deriving anything. The numbers match the web app for the same settings.
+
+## The browser extension: your account's risk on the chart
+
+A Manifest V3 extension puts the same chart beside the MyFundedPerps terminal,
+and — if you give it a **Read Only** API key — draws your own account's levels on it.
+
+```bash
+npm install && npm run ext:build     # builds dist-ext/
+# chrome://extensions -> Developer mode -> Load unpacked -> select dist-ext/
+npm run ext:zip                      # mfp-flow-extension.zip, for distribution
+```
+
+On a `/trade/...` page a **mfp·flow** button opens a resizable panel. It follows the
+terminal's market as you switch instruments, mapping the terminal's tickers onto the
+stream's (the terminal says XAU where the stream says GOLD, and some of its TradFi
+names only exist as Binance perps). If a market has no stream equivalent, the panel
+says so and lets you pick one rather than quietly charting something else.
+
+With a key saved, for the market on screen it draws:
+
+- each open position's **entry**, its **stop** and **target** (from working reduce-only
+  stop/take orders), and its **liquidation** price;
+- two **breach lines** — the price at which this market's move alone would take equity
+  to the daily-loss floor and to the max-drawdown floor, exit commission included.
+
+and a strip showing equity, both rooms in dollars and as a share of the allowance, and
+the time to the New York daily reset.
+
+### What it will not do
+
+- **It is read-only.** There is no order placement, modification or cancellation code
+  anywhere in it. The built bundle contains no non-GET request at all — only
+  `GET /v1/positions?status=open` and `GET /v1/orders?status=working`.
+- **The key never leaves the background service worker.** It is held in
+  `chrome.storage.local` (never `sync`, which would copy it to every signed-in browser),
+  it is never handed to the page, the content script or the panel, and no message can
+  read it back out. Use a **Read Only** key; a `fp_test_…` key reaches sandbox accounts only.
+- **The content script reads the URL and nothing else** about the page.
+
+### What the breach lines are not
+
+They are an estimate for a chart line, not a guarantee. A stop triggers on last price
+but fills at a fresh one, funding and swap accrue separately, and your other positions
+move too. The maths is in `src/risk/breach.ts` with hand-computed tests; floors are
+inclusive, positions on one market are netted first, and a long that cannot reach its
+floor even at zero is reported as unreachable rather than drawn at a nonsense price.
 
 ## How it uses MFP
 

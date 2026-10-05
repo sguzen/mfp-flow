@@ -79,6 +79,11 @@
         </div>
       </details>
 
+      <div class="ctrl acct" id="acctCtrl" hidden>
+        <label for="acct" class="sr">Account</label>
+        <select id="acct"></select>
+      </div>
+
       <div class="spacer"></div>
       <div class="status" id="status" aria-live="polite"><span class="led"></span><span class="txt">connecting…</span></div>
       <button class="icon" id="theme" title="Toggle light/dark" aria-label="Toggle light or dark theme">◐</button>
@@ -98,6 +103,7 @@
         </div>
       </section>
       <aside class="panel" id="panel" aria-label="Session context"></aside>
+      <div class="acct-strip" id="acctStrip" hidden></div>
     </main>
   </body>
   <script type="module" src="./src/main.ts"></script>

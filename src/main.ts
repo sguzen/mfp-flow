@@ -11,8 +11,12 @@ import { MarketFeed, type FeedChange } from "./data/feed";
 import { DEFAULT_MARKET_ID, defaultSession, isTradFi, loadMarkets, marketLabel, type Market } from "./data/markets";
 import { loadMinutes, saveMinutes } from "./data/persist";
 import { MarketStream } from "./data/stream";
+import { allowanceShare, getAccountState, getAccounts, inExtension, keyStatus, type AccountSummary } from "./ext/account";
 import { parseEmbed, isMarketMessage } from "./ext/embed";
 import { matchMarket } from "./ext/market-from-url";
+import { classifyMarket } from "./risk/costs";
+import { buildOverlay, type OrderLike, type PositionLike } from "./risk/overlay";
+import { nextDailyReset } from "./risk/time";
 import { HELP } from "./help";
 import { parseLink, serializeLink, type LinkState } from "./link";
 import { ChartModel, type ViewMode } from "./model";
@@ -475,6 +479,102 @@ function embedNote(msg: string | null) {
   el.hidden = !msg;
 }
 
+// ---------- account overlay (extension panel only) ----------
+// Read-only throughout: this asks the background worker for account data and
+// draws lines. Nothing here can place, change or cancel an order.
+const elAcctCtrl = $<HTMLDivElement>("acctCtrl");
+const elAcct = $<HTMLSelectElement>("acct");
+const elAcctStrip = $<HTMLDivElement>("acctStrip");
+let accounts: AccountSummary[] = [];
+let acctId: string | null = null;
+let acctTimer = 0;
+
+const money = (n: number | null | undefined) =>
+  n == null ? "—" : `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+
+function untilReset(now: number): string {
+  const ms = nextDailyReset(now) - now;
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  return `${h}h ${String(m).padStart(2, "0")}m`;
+}
+
+async function initAccounts() {
+  if (!embed.embed || !inExtension()) return;
+  try {
+    const st = await keyStatus();
+    if (!st.present) return;
+    accounts = (await getAccounts()).accounts;
+    if (!accounts.length) return;
+    elAcct.innerHTML = accounts
+      .map((a) => `<option value="${esc(a.id)}">${esc(a.name ?? a.account_number ?? a.id)}${a.stage ? ` · ${esc(a.stage)}` : ""}</option>`)
+      .join("");
+    acctId = accounts[0].id;
+    elAcctCtrl.hidden = false;
+    elAcct.onchange = () => {
+      acctId = elAcct.value;
+      void refreshAccount();
+    };
+    await refreshAccount();
+    // the worker throttles to one refresh per account per 5 s
+    acctTimer = window.setInterval(() => void refreshAccount(), 5_000);
+  } catch (e) {
+    embedNote(`Account data unavailable: ${(e as Error).message}`);
+  }
+}
+
+async function refreshAccount() {
+  if (!acctId || !market) return;
+  try {
+    const st = await getAccountState(acctId);
+    const risk = st.account.risk ?? null;
+    const { assetClass } = classifyMarket(market.provider, market.coin);
+    const mark = feed?.lastPrice != null ? feed.lastPrice / PRICE_SCALE : null;
+    const ov =
+      mark != null && risk
+        ? buildOverlay({
+            marketId: market.market_id,
+            positions: st.positions as unknown as PositionLike[],
+            orders: st.orders as unknown as OrderLike[],
+            mark,
+            dailyRoom: risk.daily_loss_room,
+            maxDrawdownRoom: risk.max_drawdown_room,
+            assetClass,
+            feeExempt: st.policy?.fee_exempt,
+            fmt: (n) => formatUnits(Math.round(n * PRICE_SCALE), decimalsFor(feed?.tick || PRICE_SCALE)),
+          })
+        : null;
+    chart.setAccountLines(
+      (ov?.lines ?? []).map((l) => ({ price: Math.round(l.price * PRICE_SCALE), kind: l.kind, label: l.label, tone: l.tone })),
+    );
+    renderAcctStrip(st.account, ov?.daily.status ?? "none", ov?.maxDrawdown.status ?? "none");
+  } catch (e) {
+    embedNote(`Account refresh failed: ${(e as Error).message}`);
+  }
+}
+
+function renderAcctStrip(a: AccountSummary, daily: string, dd: string) {
+  const r = a.risk;
+  if (!r) return;
+  const bits: string[] = [];
+  bits.push(`<span>Equity <b>${money(r.equity)}</b></span>`);
+  const part = (label: string, room: number | null, floor: number | null, breached: string) => {
+    const share = allowanceShare(room, a.starting_balance, floor);
+    const pct = share == null ? "" : ` (${Math.round(share * 100)}% of allowance)`;
+    const warn = breached === "already-breached" || (share != null && share < 0.25);
+    const text = breached === "already-breached" ? "breached" : `${money(room)}${pct}`;
+    bits.push(`<span class="${warn ? "warn" : ""}">${label} <b>${text}</b></span>`);
+  };
+  part("Daily room", r.daily_loss_room, r.daily_loss_floor, daily);
+  part("Max DD room", r.max_drawdown_room, r.max_drawdown_floor, dd);
+  bits.push(`<span>Daily reset in <b>${untilReset(Date.now())}</b></span>`);
+  bits.push(`<span class="ro">read-only</span>`);
+  elAcctStrip.innerHTML = bits.join("");
+  elAcctStrip.hidden = false;
+}
+
+window.addEventListener("pagehide", () => clearInterval(acctTimer));
+
 // ---------- view explainer ----------
 // Shown once per view, the first time it is opened. Storage is best effort:
 // a blocked localStorage just means the hint shows again, never a broken app.
@@ -816,6 +916,7 @@ async function boot() {
   // the terminal may be on something the stream does not carry: say so rather
   // than silently charting whatever was loaded last
   embedNote(embed.embed && embed.symbol && !fromHost ? `No stream market for “${embed.symbol}” — pick one above.` : null);
+  void initAccounts();
   helpOnView(ui.view);
 }
 

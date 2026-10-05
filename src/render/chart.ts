@@ -34,6 +34,14 @@ export interface ChartMeta {
   estDelta: boolean;
 }
 
+export interface AccountLine {
+  /** price in integer units (1e-8), like everything else the chart draws */
+  price: number;
+  kind: "entry" | "stop" | "target" | "liquidation" | "daily-breach" | "drawdown-breach";
+  label: string;
+  tone: "neutral" | "good" | "bad" | "warn";
+}
+
 interface Layout {
   w: number;
   h: number;
@@ -87,6 +95,8 @@ export class FootprintChart {
   private lastRow = 0;
   /** context-label boxes already placed this frame, so they can stack instead of overlap */
   private taken: Rect[] = [];
+  /** account overlay lines (price units), drawn by the extension panel */
+  private accountLines: AccountLine[] = [];
 
   // view state
   barW = 84;
@@ -152,6 +162,12 @@ export class FootprintChart {
 
   setMeta(p: Partial<ChartMeta>) {
     this.meta = { ...this.meta, ...p };
+    this.request();
+  }
+
+  /** Account overlay: entry / stop / target / liquidation / breach floors. */
+  setAccountLines(lines: AccountLine[]) {
+    this.accountLines = lines;
     this.request();
   }
 
@@ -357,6 +373,7 @@ export class FootprintChart {
       if (view === "footprint") this.drawDevelopingPoc(i0, i1);
     }
     if (this.meta.showMarkers && view === "footprint") this.drawContextMarkers();
+    this.drawAccountLines();
     if (this.meta.showDivergence && view !== "tpo") this.drawDivergencesPrice(i0, i1);
     this.drawLastPrice();
     ctx.restore();
@@ -1012,6 +1029,37 @@ export class FootprintChart {
       const known = fa.deltaQuality === "real" || this.meta.estDelta;
       const lab = `failed ${isUp ? "above" : "below"} ${fa.ref.label.replace("prior ", "p")} · ${known ? `Δ${fmtSigned(fa.excursionDelta)}${q} ${fa.supported ? "with" : "against"}` : "Δ unknown"}`;
       this.pill(ax, ay + (isUp ? -16 : 16), lab, P.ctxMark, isUp ? -1 : 1);
+    }
+  }
+
+  /**
+   * The account overlay. Drawn solid because every one of these is a real,
+   * measured number from the account — unlike the hatched estimated volume —
+   * except the breach floors, which are computed and so are dashed and
+   * labelled as floors. Labels go through the same stacker as the context
+   * pills, so a stop sitting on a breach line stays readable.
+   */
+  private drawAccountLines() {
+    if (!this.accountLines.length) return;
+    const ctx = this.ctx;
+    const L = this.L;
+    const P = this.pal;
+    const colorOf = (t: AccountLine["tone"]) => (t === "bad" ? P.sell : t === "good" ? P.buy : t === "warn" ? P.poc : P.text);
+    for (const l of this.accountLines) {
+      const y = Math.round(this.yOf(l.price)) + 0.5;
+      if (y < L.mainY0 - 2 || y > L.mainY1 + 2) continue;
+      const col = colorOf(l.tone);
+      const floor = l.kind === "daily-breach" || l.kind === "drawdown-breach";
+      ctx.strokeStyle = alpha(col, floor ? 0.85 : 0.95);
+      ctx.lineWidth = floor ? 1.5 : 1;
+      if (floor) ctx.setLineDash([7, 4]);
+      ctx.beginPath();
+      ctx.moveTo(L.plotX0, y);
+      ctx.lineTo(L.plotX1, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineWidth = 1;
+      this.pill(L.plotX0 + 68, y - 9, l.label, col, -1);
     }
   }
 

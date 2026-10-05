@@ -262,3 +262,16 @@ body.panel-hidden .panel { display: none; }
 /* the panel is narrow: drop the tagline and tighten the header */
 .embed .brand .tagline { display: none; }
 .embed .bar { gap: 6px; padding: 5px 8px; }
+
+/* ---------- account strip (extension panel) ---------- */
+.acct-strip {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 18;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px;
+  padding: 6px 12px; background: var(--c-panel); border-top: 1px solid var(--c-border);
+  font-size: 11.5px; color: var(--c-dim);
+}
+.acct-strip[hidden] { display: none; }
+.acct-strip b { color: var(--c-text); font-weight: 600; }
+.acct-strip .warn b { color: var(--c-sell); }
+.acct-strip .ro { margin-left: auto; opacity: .75; }
+.wrap { position: relative; }

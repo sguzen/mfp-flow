@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cvdDivergences, failedAuctions, lowVolumeNodes, nakedPocs, poorExtremes, singlePrints } from "../src/analytics/auction";
+import { cvdDivergences, failedAuctions, locationVsValue, lowVolumeNodes, nakedPocs, poorExtremes, singlePrints, valueRelation } from "../src/analytics/auction";
 import { profileFromVolumes } from "../src/analytics/profile";
 import type { Bar } from "../src/analytics/types";
 
@@ -85,6 +85,26 @@ describe("naked POCs", () => {
     expect(nakedPocs(sess, bars, 1)).toEqual([{ session: 0, row: 10 }]);
     const touched = [...bars, bar(4, 24, 24, 10, 11)];
     expect(nakedPocs(sess, touched, 1)).toEqual([]);
+  });
+});
+
+describe("value relationships", () => {
+  const prior = { val: 10, vah: 20 };
+  it("classifies two-day value placement", () => {
+    expect(valueRelation({ val: 21, vah: 30 }, prior)).toBe("higher");
+    expect(valueRelation({ val: 1, vah: 9 }, prior)).toBe("lower");
+    expect(valueRelation({ val: 15, vah: 25 }, prior)).toBe("overlapping-higher");
+    expect(valueRelation({ val: 5, vah: 15 }, prior)).toBe("overlapping-lower");
+    expect(valueRelation({ val: 12, vah: 18 }, prior)).toBe("inside");
+    expect(valueRelation({ val: 8, vah: 22 }, prior)).toBe("outside");
+    expect(valueRelation({ val: 10, vah: 20 }, prior)).toBe("unchanged");
+  });
+  it("price location vs value (row units)", () => {
+    // VA rows 10..20 with row size 5 → [50, 105)
+    expect(locationVsValue(105, prior, 5)).toBe("above");
+    expect(locationVsValue(104, prior, 5)).toBe("inside");
+    expect(locationVsValue(50, prior, 5)).toBe("inside");
+    expect(locationVsValue(49, prior, 5)).toBe("below");
   });
 });
 

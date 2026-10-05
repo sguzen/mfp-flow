@@ -269,6 +269,35 @@ export function cvdDivergences(bars: Bar[], cvd: number[], lookback = 20, from =
   return out;
 }
 
+export type ValueRelation =
+  | "higher"
+  | "overlapping-higher"
+  | "unchanged"
+  | "overlapping-lower"
+  | "lower"
+  | "inside"
+  | "outside";
+
+/**
+ * Two-day value relationship (Dalton): compare today's value area [val, vah]
+ * with the prior session's. Inputs are row indices (inclusive).
+ */
+export function valueRelation(cur: { val: number; vah: number }, prior: { val: number; vah: number }): ValueRelation {
+  if (cur.val === prior.val && cur.vah === prior.vah) return "unchanged";
+  if (cur.val > prior.vah) return "higher";
+  if (cur.vah < prior.val) return "lower";
+  if (cur.val >= prior.val && cur.vah <= prior.vah) return "inside";
+  if (cur.val <= prior.val && cur.vah >= prior.vah) return "outside";
+  return cur.vah > prior.vah ? "overlapping-higher" : "overlapping-lower";
+}
+
+/** Where a price sits relative to a value area (prices in units, VA in rows). */
+export function locationVsValue(price: number, va: { val: number; vah: number }, rowUnits: number): "above" | "inside" | "below" {
+  if (price >= (va.vah + 1) * rowUnits) return "above";
+  if (price < va.val * rowUnits) return "below";
+  return "inside";
+}
+
 /** VA references of a session for failed-auction checks. */
 export function sessionRefs(va: ValueArea | null, high: number, low: number, rowUnits: number, label: string): Reference[] {
   const refs: Reference[] = [];

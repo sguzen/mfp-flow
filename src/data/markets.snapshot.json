@@ -1,1 +1,980 @@
-{"data":[{"coin":"xyz:AAPL","market_id":"hyperliquid|xyz:AAPL","max_leverage":5,"provider":"hyperliquid","size_decimals":3,"symbol":"AAPL"},{"coin":"AAVEUSDT","market_id":"binance|AAVEUSDT","max_leverage":3,"provider":"binance","size_decimals":1,"symbol":"AAVE"},{"coin":"ADAUSDT","market_id":"binance|ADAUSDT","max_leverage":3,"provider":"binance","size_decimals":0,"symbol":"ADA"},{"coin":"AMDUSDT","market_id":"binance|AMDUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"AMD"},{"coin":"xyz:AMZN","market_id":"hyperliquid|xyz:AMZN","max_leverage":5,"provider":"hyperliquid","size_decimals":3,"symbol":"AMZN"},{"coin":"ARMUSDT","market_id":"binance|ARMUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"ARM"},{"coin":"AVAXUSDT","market_id":"binance|AVAXUSDT","max_leverage":3,"provider":"binance","size_decimals":0,"symbol":"AVAX"},{"coin":"AVGOUSDT","market_id":"binance|AVGOUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"AVGO"},{"coin":"BABAUSDT","market_id":"binance|BABAUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"BABA"},{"coin":"BEUSDT","market_id":"binance|BEUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"BE"},{"coin":"xyz:BRENTOIL","market_id":"hyperliquid|xyz:BRENTOIL","max_leverage":8,"provider":"hyperliquid","size_decimals":2,"symbol":"BRENTOIL"},{"coin":"BTCUSDT","market_id":"binance|BTCUSDT","max_leverage":10,"provider":"binance","size_decimals":3,"symbol":"BTC"},{"coin":"CASHCAT","market_id":"hyperliquid|CASHCAT","max_leverage":2,"provider":"hyperliquid","size_decimals":0,"symbol":"CASHCAT"},{"coin":"CLUSDT","market_id":"binance|CLUSDT","max_leverage":8,"provider":"binance","size_decimals":2,"symbol":"CL"},{"coin":"COINUSDT","market_id":"binance|COINUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"COIN"},{"coin":"CRCLUSDT","market_id":"binance|CRCLUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"CRCL"},{"coin":"CRWVUSDT","market_id":"binance|CRWVUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"CRWV"},{"coin":"DELLUSDT","market_id":"binance|DELLUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"DELL"},{"coin":"DOGEUSDT","market_id":"binance|DOGEUSDT","max_leverage":5,"provider":"binance","size_decimals":0,"symbol":"DOGE"},{"coin":"ENAUSDT","market_id":"binance|ENAUSDT","max_leverage":3,"provider":"binance","size_decimals":0,"symbol":"ENA"},{"coin":"ETHUSDT","market_id":"binance|ETHUSDT","max_leverage":10,"provider":"binance","size_decimals":3,"symbol":"ETH"},{"coin":"xyz:EUR","market_id":"hyperliquid|xyz:EUR","max_leverage":50,"provider":"hyperliquid","size_decimals":1,"symbol":"EUR"},{"coin":"FARTCOINUSDT","market_id":"binance|FARTCOINUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"FARTCOIN"},{"coin":"xyz:GOLD","market_id":"hyperliquid|xyz:GOLD","max_leverage":10,"provider":"hyperliquid","size_decimals":4,"symbol":"GOLD"},{"coin":"GOOGLUSDT","market_id":"binance|GOOGLUSDT","max_leverage":4,"provider":"binance","size_decimals":2,"symbol":"GOOGL"},{"coin":"GRAMUSDT","market_id":"binance|GRAMUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"GRAM"},{"coin":"HOODUSDT","market_id":"binance|HOODUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"HOOD"},{"coin":"HYPEUSDT","market_id":"binance|HYPEUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"HYPE"},{"coin":"INTCUSDT","market_id":"binance|INTCUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"INTC"},{"coin":"xyz:JP225","market_id":"hyperliquid|xyz:JP225","max_leverage":5,"provider":"hyperliquid","size_decimals":5,"symbol":"JP225"},{"coin":"xyz:JPY","market_id":"hyperliquid|xyz:JPY","max_leverage":50,"provider":"hyperliquid","size_decimals":2,"symbol":"JPY"},{"coin":"KAITOUSDT","market_id":"binance|KAITOUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"KAITO"},{"coin":"LINKUSDT","market_id":"binance|LINKUSDT","max_leverage":3,"provider":"binance","size_decimals":2,"symbol":"LINK"},{"coin":"LITUSDT","market_id":"binance|LITUSDT","max_leverage":3,"provider":"binance","size_decimals":1,"symbol":"LIT"},{"coin":"xyz:LLY","market_id":"hyperliquid|xyz:LLY","max_leverage":5,"provider":"hyperliquid","size_decimals":4,"symbol":"LLY"},{"coin":"METAUSDT","market_id":"binance|METAUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"META"},{"coin":"MRVLUSDT","market_id":"binance|MRVLUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"MRVL"},{"coin":"xyz:MSFT","market_id":"hyperliquid|xyz:MSFT","max_leverage":5,"provider":"hyperliquid","size_decimals":3,"symbol":"MSFT"},{"coin":"MUUSDT","market_id":"binance|MUUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"MU"},{"coin":"NATGASUSDT","market_id":"binance|NATGASUSDT","max_leverage":5,"provider":"binance","size_decimals":1,"symbol":"NATGAS"},{"coin":"NBISUSDT","market_id":"binance|NBISUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"NBIS"},{"coin":"NEARUSDT","market_id":"binance|NEARUSDT","max_leverage":3,"provider":"binance","size_decimals":0,"symbol":"NEAR"},{"coin":"NVDAUSDT","market_id":"binance|NVDAUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"NVDA"},{"coin":"ONDOUSDT","market_id":"binance|ONDOUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"ONDO"},{"coin":"ORCLUSDT","market_id":"binance|ORCLUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"ORCL"},{"coin":"xyz:PALLADIUM","market_id":"hyperliquid|xyz:PALLADIUM","max_leverage":5,"provider":"hyperliquid","size_decimals":4,"symbol":"PALLADIUM"},{"coin":"xyz:PLATINUM","market_id":"hyperliquid|xyz:PLATINUM","max_leverage":5,"provider":"hyperliquid","size_decimals":4,"symbol":"PLATINUM"},{"coin":"PLTRUSDT","market_id":"binance|PLTRUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"PLTR"},{"coin":"PUMPUSDT","market_id":"binance|PUMPUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"PUMP"},{"coin":"QCOMUSDT","market_id":"binance|QCOMUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"QCOM"},{"coin":"RKLBUSDT","market_id":"binance|RKLBUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"RKLB"},{"coin":"xyz:SILVER","market_id":"hyperliquid|xyz:SILVER","max_leverage":8,"provider":"hyperliquid","size_decimals":2,"symbol":"SILVER"},{"coin":"xyz:SKHX","market_id":"hyperliquid|xyz:SKHX","max_leverage":5,"provider":"hyperliquid","size_decimals":3,"symbol":"SKHX"},{"coin":"xyz:SMSN","market_id":"hyperliquid|xyz:SMSN","max_leverage":5,"provider":"hyperliquid","size_decimals":3,"symbol":"SMSN"},{"coin":"SNDKUSDT","market_id":"binance|SNDKUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"SNDK"},{"coin":"SOLUSDT","market_id":"binance|SOLUSDT","max_leverage":8,"provider":"binance","size_decimals":2,"symbol":"SOL"},{"coin":"xyz:SP500","market_id":"hyperliquid|xyz:SP500","max_leverage":12,"provider":"hyperliquid","size_decimals":3,"symbol":"SP500"},{"coin":"SPCXUSDT","market_id":"binance|SPCXUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"SPCX"},{"coin":"SUIUSDT","market_id":"binance|SUIUSDT","max_leverage":3,"provider":"binance","size_decimals":1,"symbol":"SUI"},{"coin":"TAOUSDT","market_id":"binance|TAOUSDT","max_leverage":3,"provider":"binance","size_decimals":3,"symbol":"TAO"},{"coin":"TSLAUSDT","market_id":"binance|TSLAUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"TSLA"},{"coin":"TSMUSDT","market_id":"binance|TSMUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"TSM"},{"coin":"UNIUSDT","market_id":"binance|UNIUSDT","max_leverage":3,"provider":"binance","size_decimals":0,"symbol":"UNI"},{"coin":"WLDUSDT","market_id":"binance|WLDUSDT","max_leverage":3,"provider":"binance","size_decimals":0,"symbol":"WLD"},{"coin":"XMRUSDT","market_id":"binance|XMRUSDT","max_leverage":2,"provider":"binance","size_decimals":3,"symbol":"XMR"},{"coin":"XPLUSDT","market_id":"binance|XPLUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"XPL"},{"coin":"XRPUSDT","market_id":"binance|XRPUSDT","max_leverage":8,"provider":"binance","size_decimals":1,"symbol":"XRP"},{"coin":"xyz:XYZ100","market_id":"hyperliquid|xyz:XYZ100","max_leverage":12,"provider":"hyperliquid","size_decimals":4,"symbol":"XYZ100"},{"coin":"ZECUSDT","market_id":"binance|ZECUSDT","max_leverage":3,"provider":"binance","size_decimals":3,"symbol":"ZEC"},{"coin":"1000BONKUSDT","market_id":"binance|1000BONKUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"1000BONK"},{"coin":"1000PEPEUSDT","market_id":"binance|1000PEPEUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"1000PEPE"},{"coin":"AEROUSDT","market_id":"binance|AEROUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"AERO"},{"coin":"ALGOUSDT","market_id":"binance|ALGOUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"ALGO"},{"coin":"APTUSDT","market_id":"binance|APTUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"APT"},{"coin":"ARBUSDT","market_id":"binance|ARBUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"ARB"},{"coin":"ASTERUSDT","market_id":"binance|ASTERUSDT","max_leverage":3,"provider":"binance","size_decimals":0,"symbol":"ASTER"},{"coin":"ATOMUSDT","market_id":"binance|ATOMUSDT","max_leverage":2,"provider":"binance","size_decimals":2,"symbol":"ATOM"},{"coin":"BCHUSDT","market_id":"binance|BCHUSDT","max_leverage":3,"provider":"binance","size_decimals":3,"symbol":"BCH"},{"coin":"BNBUSDT","market_id":"binance|BNBUSDT","max_leverage":8,"provider":"binance","size_decimals":2,"symbol":"BNB"},{"coin":"CRVUSDT","market_id":"binance|CRVUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"CRV"},{"coin":"DOTUSDT","market_id":"binance|DOTUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"DOT"},{"coin":"ETHFIUSDT","market_id":"binance|ETHFIUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"ETHFI"},{"coin":"FILUSDT","market_id":"binance|FILUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"FIL"},{"coin":"HBARUSDT","market_id":"binance|HBARUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"HBAR"},{"coin":"ICPUSDT","market_id":"binance|ICPUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"ICP"},{"coin":"INJUSDT","market_id":"binance|INJUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"INJ"},{"coin":"JUPUSDT","market_id":"binance|JUPUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"JUP"},{"coin":"LDOUSDT","market_id":"binance|LDOUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"LDO"},{"coin":"LTCUSDT","market_id":"binance|LTCUSDT","max_leverage":3,"provider":"binance","size_decimals":3,"symbol":"LTC"},{"coin":"OPUSDT","market_id":"binance|OPUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"OP"},{"coin":"PENGUUSDT","market_id":"binance|PENGUUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"PENGU"},{"coin":"POLUSDT","market_id":"binance|POLUSDT","max_leverage":3,"provider":"binance","size_decimals":0,"symbol":"POL"},{"coin":"SEIUSDT","market_id":"binance|SEIUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"SEI"},{"coin":"TRUMPUSDT","market_id":"binance|TRUMPUSDT","max_leverage":2,"provider":"binance","size_decimals":2,"symbol":"TRUMP"},{"coin":"TRXUSDT","market_id":"binance|TRXUSDT","max_leverage":5,"provider":"binance","size_decimals":0,"symbol":"TRX"},{"coin":"WIFUSDT","market_id":"binance|WIFUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"WIF"},{"coin":"WLFIUSDT","market_id":"binance|WLFIUSDT","max_leverage":3,"provider":"binance","size_decimals":0,"symbol":"WLFI"},{"coin":"XLMUSDT","market_id":"binance|XLMUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"XLM"},{"coin":"1000SHIBUSDT","market_id":"binance|1000SHIBUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"1000SHIB"},{"coin":"ANTHROPICUSDT","market_id":"binance|ANTHROPICUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"ANTHROPIC"},{"coin":"BMNRUSDT","market_id":"binance|BMNRUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"BMNR"},{"coin":"COHRUSDT","market_id":"binance|COHRUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"COHR"},{"coin":"COPPERUSDT","market_id":"binance|COPPERUSDT","max_leverage":5,"provider":"binance","size_decimals":1,"symbol":"COPPER"},{"coin":"CXMTUSDT","market_id":"binance|CXMTUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"CXMT"},{"coin":"DASHUSDT","market_id":"binance|DASHUSDT","max_leverage":2,"provider":"binance","size_decimals":3,"symbol":"DASH"},{"coin":"DRAMUSDT","market_id":"binance|DRAMUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"DRAM"},{"coin":"ETCUSDT","market_id":"binance|ETCUSDT","max_leverage":2,"provider":"binance","size_decimals":2,"symbol":"ETC"},{"coin":"EWYUSDT","market_id":"binance|EWYUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"EWY"},{"coin":"FETUSDT","market_id":"binance|FETUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"FET"},{"coin":"JTOUSDT","market_id":"binance|JTOUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"JTO"},{"coin":"MONUSDT","market_id":"binance|MONUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"MON"},{"coin":"MSTRUSDT","market_id":"binance|MSTRUSDT","max_leverage":2,"provider":"binance","size_decimals":2,"symbol":"MSTR"},{"coin":"OPENAIUSDT","market_id":"binance|OPENAIUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"OPENAI"},{"coin":"PENDLEUSDT","market_id":"binance|PENDLEUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"PENDLE"},{"coin":"PONSUSDT","market_id":"binance|PONSUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"PONS"},{"coin":"PYTHUSDT","market_id":"binance|PYTHUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"PYTH"},{"coin":"QQQUSDT","market_id":"binance|QQQUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"QQQ"},{"coin":"RENDERUSDT","market_id":"binance|RENDERUSDT","max_leverage":2,"provider":"binance","size_decimals":1,"symbol":"RENDER"},{"coin":"SOXLUSDT","market_id":"binance|SOXLUSDT","max_leverage":2,"provider":"binance","size_decimals":2,"symbol":"SOXL"},{"coin":"SPXUSDT","market_id":"binance|SPXUSDT","max_leverage":2,"provider":"binance","size_decimals":0,"symbol":"SPX"},{"coin":"VVVUSDT","market_id":"binance|VVVUSDT","max_leverage":2,"provider":"binance","size_decimals":2,"symbol":"VVV"},{"coin":"WDCUSDT","market_id":"binance|WDCUSDT","max_leverage":5,"provider":"binance","size_decimals":2,"symbol":"WDC"}]}
+{
+ "data": [
+  {
+   "coin": "xyz:AAPL",
+   "market_id": "hyperliquid|xyz:AAPL",
+   "max_leverage": 5,
+   "provider": "hyperliquid",
+   "size_decimals": 3,
+   "symbol": "AAPL"
+  },
+  {
+   "coin": "AAVEUSDT",
+   "market_id": "binance|AAVEUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "AAVE"
+  },
+  {
+   "coin": "ADAUSDT",
+   "market_id": "binance|ADAUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "ADA"
+  },
+  {
+   "coin": "AMDUSDT",
+   "market_id": "binance|AMDUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "AMD"
+  },
+  {
+   "coin": "xyz:AMZN",
+   "market_id": "hyperliquid|xyz:AMZN",
+   "max_leverage": 5,
+   "provider": "hyperliquid",
+   "size_decimals": 3,
+   "symbol": "AMZN"
+  },
+  {
+   "coin": "ARMUSDT",
+   "market_id": "binance|ARMUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "ARM"
+  },
+  {
+   "coin": "AVAXUSDT",
+   "market_id": "binance|AVAXUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "AVAX"
+  },
+  {
+   "coin": "AVGOUSDT",
+   "market_id": "binance|AVGOUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "AVGO"
+  },
+  {
+   "coin": "BABAUSDT",
+   "market_id": "binance|BABAUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "BABA"
+  },
+  {
+   "coin": "BEUSDT",
+   "market_id": "binance|BEUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "BE"
+  },
+  {
+   "coin": "xyz:BRENTOIL",
+   "market_id": "hyperliquid|xyz:BRENTOIL",
+   "max_leverage": 8,
+   "provider": "hyperliquid",
+   "size_decimals": 2,
+   "symbol": "BRENTOIL"
+  },
+  {
+   "coin": "BTCUSDT",
+   "market_id": "binance|BTCUSDT",
+   "max_leverage": 10,
+   "provider": "binance",
+   "size_decimals": 3,
+   "symbol": "BTC"
+  },
+  {
+   "coin": "CASHCAT",
+   "market_id": "hyperliquid|CASHCAT",
+   "max_leverage": 2,
+   "provider": "hyperliquid",
+   "size_decimals": 0,
+   "symbol": "CASHCAT"
+  },
+  {
+   "coin": "CLUSDT",
+   "market_id": "binance|CLUSDT",
+   "max_leverage": 8,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "CL"
+  },
+  {
+   "coin": "COINUSDT",
+   "market_id": "binance|COINUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "COIN"
+  },
+  {
+   "coin": "CRCLUSDT",
+   "market_id": "binance|CRCLUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "CRCL"
+  },
+  {
+   "coin": "CRWVUSDT",
+   "market_id": "binance|CRWVUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "CRWV"
+  },
+  {
+   "coin": "DELLUSDT",
+   "market_id": "binance|DELLUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "DELL"
+  },
+  {
+   "coin": "DOGEUSDT",
+   "market_id": "binance|DOGEUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "DOGE"
+  },
+  {
+   "coin": "ENAUSDT",
+   "market_id": "binance|ENAUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "ENA"
+  },
+  {
+   "coin": "ETHUSDT",
+   "market_id": "binance|ETHUSDT",
+   "max_leverage": 10,
+   "provider": "binance",
+   "size_decimals": 3,
+   "symbol": "ETH"
+  },
+  {
+   "coin": "xyz:EUR",
+   "market_id": "hyperliquid|xyz:EUR",
+   "max_leverage": 50,
+   "provider": "hyperliquid",
+   "size_decimals": 1,
+   "symbol": "EUR"
+  },
+  {
+   "coin": "FARTCOINUSDT",
+   "market_id": "binance|FARTCOINUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "FARTCOIN"
+  },
+  {
+   "coin": "xyz:GOLD",
+   "market_id": "hyperliquid|xyz:GOLD",
+   "max_leverage": 10,
+   "provider": "hyperliquid",
+   "size_decimals": 4,
+   "symbol": "GOLD"
+  },
+  {
+   "coin": "GOOGLUSDT",
+   "market_id": "binance|GOOGLUSDT",
+   "max_leverage": 4,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "GOOGL"
+  },
+  {
+   "coin": "GRAMUSDT",
+   "market_id": "binance|GRAMUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "GRAM"
+  },
+  {
+   "coin": "HOODUSDT",
+   "market_id": "binance|HOODUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "HOOD"
+  },
+  {
+   "coin": "HYPEUSDT",
+   "market_id": "binance|HYPEUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "HYPE"
+  },
+  {
+   "coin": "INTCUSDT",
+   "market_id": "binance|INTCUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "INTC"
+  },
+  {
+   "coin": "xyz:JP225",
+   "market_id": "hyperliquid|xyz:JP225",
+   "max_leverage": 5,
+   "provider": "hyperliquid",
+   "size_decimals": 5,
+   "symbol": "JP225"
+  },
+  {
+   "coin": "xyz:JPY",
+   "market_id": "hyperliquid|xyz:JPY",
+   "max_leverage": 50,
+   "provider": "hyperliquid",
+   "size_decimals": 2,
+   "symbol": "JPY"
+  },
+  {
+   "coin": "KAITOUSDT",
+   "market_id": "binance|KAITOUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "KAITO"
+  },
+  {
+   "coin": "LINKUSDT",
+   "market_id": "binance|LINKUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "LINK"
+  },
+  {
+   "coin": "LITUSDT",
+   "market_id": "binance|LITUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "LIT"
+  },
+  {
+   "coin": "xyz:LLY",
+   "market_id": "hyperliquid|xyz:LLY",
+   "max_leverage": 5,
+   "provider": "hyperliquid",
+   "size_decimals": 4,
+   "symbol": "LLY"
+  },
+  {
+   "coin": "METAUSDT",
+   "market_id": "binance|METAUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "META"
+  },
+  {
+   "coin": "MRVLUSDT",
+   "market_id": "binance|MRVLUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "MRVL"
+  },
+  {
+   "coin": "xyz:MSFT",
+   "market_id": "hyperliquid|xyz:MSFT",
+   "max_leverage": 5,
+   "provider": "hyperliquid",
+   "size_decimals": 3,
+   "symbol": "MSFT"
+  },
+  {
+   "coin": "MUUSDT",
+   "market_id": "binance|MUUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "MU"
+  },
+  {
+   "coin": "NATGASUSDT",
+   "market_id": "binance|NATGASUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "NATGAS"
+  },
+  {
+   "coin": "NBISUSDT",
+   "market_id": "binance|NBISUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "NBIS"
+  },
+  {
+   "coin": "NEARUSDT",
+   "market_id": "binance|NEARUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "NEAR"
+  },
+  {
+   "coin": "NVDAUSDT",
+   "market_id": "binance|NVDAUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "NVDA"
+  },
+  {
+   "coin": "ONDOUSDT",
+   "market_id": "binance|ONDOUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "ONDO"
+  },
+  {
+   "coin": "ORCLUSDT",
+   "market_id": "binance|ORCLUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "ORCL"
+  },
+  {
+   "coin": "xyz:PALLADIUM",
+   "market_id": "hyperliquid|xyz:PALLADIUM",
+   "max_leverage": 5,
+   "provider": "hyperliquid",
+   "size_decimals": 4,
+   "symbol": "PALLADIUM"
+  },
+  {
+   "coin": "xyz:PLATINUM",
+   "market_id": "hyperliquid|xyz:PLATINUM",
+   "max_leverage": 5,
+   "provider": "hyperliquid",
+   "size_decimals": 4,
+   "symbol": "PLATINUM"
+  },
+  {
+   "coin": "PLTRUSDT",
+   "market_id": "binance|PLTRUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "PLTR"
+  },
+  {
+   "coin": "PUMPUSDT",
+   "market_id": "binance|PUMPUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "PUMP"
+  },
+  {
+   "coin": "QCOMUSDT",
+   "market_id": "binance|QCOMUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "QCOM"
+  },
+  {
+   "coin": "RKLBUSDT",
+   "market_id": "binance|RKLBUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "RKLB"
+  },
+  {
+   "coin": "xyz:SILVER",
+   "market_id": "hyperliquid|xyz:SILVER",
+   "max_leverage": 8,
+   "provider": "hyperliquid",
+   "size_decimals": 2,
+   "symbol": "SILVER"
+  },
+  {
+   "coin": "xyz:SKHX",
+   "market_id": "hyperliquid|xyz:SKHX",
+   "max_leverage": 5,
+   "provider": "hyperliquid",
+   "size_decimals": 3,
+   "symbol": "SKHX"
+  },
+  {
+   "coin": "xyz:SMSN",
+   "market_id": "hyperliquid|xyz:SMSN",
+   "max_leverage": 5,
+   "provider": "hyperliquid",
+   "size_decimals": 3,
+   "symbol": "SMSN"
+  },
+  {
+   "coin": "SNDKUSDT",
+   "market_id": "binance|SNDKUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "SNDK"
+  },
+  {
+   "coin": "SOLUSDT",
+   "market_id": "binance|SOLUSDT",
+   "max_leverage": 8,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "SOL"
+  },
+  {
+   "coin": "xyz:SP500",
+   "market_id": "hyperliquid|xyz:SP500",
+   "max_leverage": 12,
+   "provider": "hyperliquid",
+   "size_decimals": 3,
+   "symbol": "SP500"
+  },
+  {
+   "coin": "SPCXUSDT",
+   "market_id": "binance|SPCXUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "SPCX"
+  },
+  {
+   "coin": "SUIUSDT",
+   "market_id": "binance|SUIUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "SUI"
+  },
+  {
+   "coin": "TAOUSDT",
+   "market_id": "binance|TAOUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 3,
+   "symbol": "TAO"
+  },
+  {
+   "coin": "TSLAUSDT",
+   "market_id": "binance|TSLAUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "TSLA"
+  },
+  {
+   "coin": "TSMUSDT",
+   "market_id": "binance|TSMUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "TSM"
+  },
+  {
+   "coin": "UNIUSDT",
+   "market_id": "binance|UNIUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "UNI"
+  },
+  {
+   "coin": "WLDUSDT",
+   "market_id": "binance|WLDUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "WLD"
+  },
+  {
+   "coin": "XMRUSDT",
+   "market_id": "binance|XMRUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 3,
+   "symbol": "XMR"
+  },
+  {
+   "coin": "XPLUSDT",
+   "market_id": "binance|XPLUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "XPL"
+  },
+  {
+   "coin": "XRPUSDT",
+   "market_id": "binance|XRPUSDT",
+   "max_leverage": 8,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "XRP"
+  },
+  {
+   "coin": "xyz:XYZ100",
+   "market_id": "hyperliquid|xyz:XYZ100",
+   "max_leverage": 12,
+   "provider": "hyperliquid",
+   "size_decimals": 4,
+   "symbol": "XYZ100"
+  },
+  {
+   "coin": "ZECUSDT",
+   "market_id": "binance|ZECUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 3,
+   "symbol": "ZEC"
+  },
+  {
+   "coin": "1000BONKUSDT",
+   "market_id": "binance|1000BONKUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "1000BONK"
+  },
+  {
+   "coin": "1000PEPEUSDT",
+   "market_id": "binance|1000PEPEUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "1000PEPE"
+  },
+  {
+   "coin": "AEROUSDT",
+   "market_id": "binance|AEROUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "AERO"
+  },
+  {
+   "coin": "ALGOUSDT",
+   "market_id": "binance|ALGOUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "ALGO"
+  },
+  {
+   "coin": "APTUSDT",
+   "market_id": "binance|APTUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "APT"
+  },
+  {
+   "coin": "ARBUSDT",
+   "market_id": "binance|ARBUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "ARB"
+  },
+  {
+   "coin": "ASTERUSDT",
+   "market_id": "binance|ASTERUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "ASTER"
+  },
+  {
+   "coin": "ATOMUSDT",
+   "market_id": "binance|ATOMUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "ATOM"
+  },
+  {
+   "coin": "BCHUSDT",
+   "market_id": "binance|BCHUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 3,
+   "symbol": "BCH"
+  },
+  {
+   "coin": "BNBUSDT",
+   "market_id": "binance|BNBUSDT",
+   "max_leverage": 8,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "BNB"
+  },
+  {
+   "coin": "CRVUSDT",
+   "market_id": "binance|CRVUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "CRV"
+  },
+  {
+   "coin": "DOTUSDT",
+   "market_id": "binance|DOTUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "DOT"
+  },
+  {
+   "coin": "ETHFIUSDT",
+   "market_id": "binance|ETHFIUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "ETHFI"
+  },
+  {
+   "coin": "FILUSDT",
+   "market_id": "binance|FILUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "FIL"
+  },
+  {
+   "coin": "HBARUSDT",
+   "market_id": "binance|HBARUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "HBAR"
+  },
+  {
+   "coin": "ICPUSDT",
+   "market_id": "binance|ICPUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "ICP"
+  },
+  {
+   "coin": "INJUSDT",
+   "market_id": "binance|INJUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "INJ"
+  },
+  {
+   "coin": "JUPUSDT",
+   "market_id": "binance|JUPUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "JUP"
+  },
+  {
+   "coin": "LDOUSDT",
+   "market_id": "binance|LDOUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "LDO"
+  },
+  {
+   "coin": "LTCUSDT",
+   "market_id": "binance|LTCUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 3,
+   "symbol": "LTC"
+  },
+  {
+   "coin": "OPUSDT",
+   "market_id": "binance|OPUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "OP"
+  },
+  {
+   "coin": "PENGUUSDT",
+   "market_id": "binance|PENGUUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "PENGU"
+  },
+  {
+   "coin": "POLUSDT",
+   "market_id": "binance|POLUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "POL"
+  },
+  {
+   "coin": "SEIUSDT",
+   "market_id": "binance|SEIUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "SEI"
+  },
+  {
+   "coin": "TRUMPUSDT",
+   "market_id": "binance|TRUMPUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "TRUMP"
+  },
+  {
+   "coin": "TRXUSDT",
+   "market_id": "binance|TRXUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "TRX"
+  },
+  {
+   "coin": "WIFUSDT",
+   "market_id": "binance|WIFUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "WIF"
+  },
+  {
+   "coin": "WLFIUSDT",
+   "market_id": "binance|WLFIUSDT",
+   "max_leverage": 3,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "WLFI"
+  },
+  {
+   "coin": "XLMUSDT",
+   "market_id": "binance|XLMUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "XLM"
+  },
+  {
+   "coin": "1000SHIBUSDT",
+   "market_id": "binance|1000SHIBUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "1000SHIB"
+  },
+  {
+   "coin": "ANTHROPICUSDT",
+   "market_id": "binance|ANTHROPICUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "ANTHROPIC"
+  },
+  {
+   "coin": "BMNRUSDT",
+   "market_id": "binance|BMNRUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "BMNR"
+  },
+  {
+   "coin": "COHRUSDT",
+   "market_id": "binance|COHRUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "COHR"
+  },
+  {
+   "coin": "COPPERUSDT",
+   "market_id": "binance|COPPERUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "COPPER"
+  },
+  {
+   "coin": "CXMTUSDT",
+   "market_id": "binance|CXMTUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "CXMT"
+  },
+  {
+   "coin": "DASHUSDT",
+   "market_id": "binance|DASHUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 3,
+   "symbol": "DASH"
+  },
+  {
+   "coin": "DRAMUSDT",
+   "market_id": "binance|DRAMUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "DRAM"
+  },
+  {
+   "coin": "ETCUSDT",
+   "market_id": "binance|ETCUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "ETC"
+  },
+  {
+   "coin": "EWYUSDT",
+   "market_id": "binance|EWYUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "EWY"
+  },
+  {
+   "coin": "FETUSDT",
+   "market_id": "binance|FETUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "FET"
+  },
+  {
+   "coin": "JTOUSDT",
+   "market_id": "binance|JTOUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "JTO"
+  },
+  {
+   "coin": "MONUSDT",
+   "market_id": "binance|MONUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "MON"
+  },
+  {
+   "coin": "MSTRUSDT",
+   "market_id": "binance|MSTRUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "MSTR"
+  },
+  {
+   "coin": "OPENAIUSDT",
+   "market_id": "binance|OPENAIUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "OPENAI"
+  },
+  {
+   "coin": "PENDLEUSDT",
+   "market_id": "binance|PENDLEUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "PENDLE"
+  },
+  {
+   "coin": "PONSUSDT",
+   "market_id": "binance|PONSUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "PONS"
+  },
+  {
+   "coin": "PYTHUSDT",
+   "market_id": "binance|PYTHUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "PYTH"
+  },
+  {
+   "coin": "QQQUSDT",
+   "market_id": "binance|QQQUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "QQQ"
+  },
+  {
+   "coin": "RENDERUSDT",
+   "market_id": "binance|RENDERUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 1,
+   "symbol": "RENDER"
+  },
+  {
+   "coin": "SOXLUSDT",
+   "market_id": "binance|SOXLUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "SOXL"
+  },
+  {
+   "coin": "SPXUSDT",
+   "market_id": "binance|SPXUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 0,
+   "symbol": "SPX"
+  },
+  {
+   "coin": "VVVUSDT",
+   "market_id": "binance|VVVUSDT",
+   "max_leverage": 2,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "VVV"
+  },
+  {
+   "coin": "WDCUSDT",
+   "market_id": "binance|WDCUSDT",
+   "max_leverage": 5,
+   "provider": "binance",
+   "size_decimals": 2,
+   "symbol": "WDC"
+  }
+ ]
+}

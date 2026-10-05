@@ -22,6 +22,8 @@ export interface Candle {
   c: number;
   /** base volume */
   v: number;
+  /** candle length in ms when coarser than 1 minute (older history fallback) */
+  dur?: number;
 }
 
 /** Real per-minute footprint built from live trades at the fine row size. */

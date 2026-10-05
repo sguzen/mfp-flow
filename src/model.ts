@@ -17,7 +17,9 @@ import {
 } from "./analytics/auction";
 import { MINUTE } from "./analytics/footprint";
 import { diagonalImbalances, stackedImbalances, type Imbalance } from "./analytics/imbalance";
+import { mergeProfiles, valueArea, type Profile, type ValueArea } from "./analytics/profile";
 import { barDelta, buildBars, buildSessions, minuteKeys, type MinuteSource, type SessionStats } from "./analytics/series";
+import { buildTpo, TPO_PERIOD_MS, type TpoProfile } from "./analytics/tpo";
 import type { SessionSpec } from "./analytics/session";
 import { barSource, type Bar } from "./analytics/types";
 
@@ -34,6 +36,21 @@ export interface ModelSettings {
   nakedLookback: number;
   /** bars of lookback for CVD divergence */
   divLookback: number;
+  /** chart view */
+  view: ViewMode;
+  /** right-hand profile: the session at the right edge, or a composite of the last N sessions */
+  rightProfile: "session" | "composite";
+  compositeDays: number;
+}
+
+export type ViewMode = "footprint" | "profiles" | "tpo";
+
+export interface Composite {
+  days: number;
+  start: number;
+  profile: Profile;
+  va: ValueArea | null;
+  realShare: number;
 }
 
 export interface DivergenceMark {
@@ -64,6 +81,10 @@ export class ChartModel {
   /** per bar: whether all of the bar's delta is real */
   realBar: boolean[] = [];
   ctx: Context = emptyCtx();
+  /** composite of the last `compositeDays` sessions (incl. the current one) */
+  composite: Composite | null = null;
+  /** TPO profile per session (same indexing as `sessions`); built only in TPO view */
+  tpo: (TpoProfile | null)[] = [];
   settings: ModelSettings;
   version = 0;
   buildMs = 0;
@@ -82,6 +103,8 @@ export class ChartModel {
       this.cvd = [];
       this.realBar = [];
       this.ctx = emptyCtx();
+      this.composite = null;
+      this.tpo = [];
       this.version++;
       return;
     }
@@ -104,6 +127,8 @@ export class ChartModel {
       }
     }
     this.ctx = this.buildContext();
+    this.composite = this.buildComposite();
+    this.tpo = s.view === "tpo" ? this.buildTpo(src, keys) : [];
     this.version++;
     this.buildMs = performance.now() - t0;
   }
@@ -160,6 +185,38 @@ export class ChartModel {
     // without estimated delta, historical (est-only) bars have zero delta; don't flag those
     const divs = s.estDelta ? divergences : divergences.filter((d) => d.quality === "real" || this.bars[d.idx].buy + this.bars[d.idx].sell > 0);
     return { sessionIdx: n - 1, prior, lvn, singlePrints: sp, poor, failed, naked, divergences: divs };
+  }
+
+  private buildComposite(): Composite | null {
+    const n = this.sessions.length;
+    if (!n) return null;
+    const take = this.sessions.slice(Math.max(0, n - this.settings.compositeDays));
+    const profile = mergeProfiles(take.map((x) => x.profile));
+    let real = 0;
+    for (let i = 0; i < profile.vol.length; i++) real += profile.buy[i] + profile.sell[i];
+    return {
+      days: take.length,
+      start: take[0].start,
+      profile,
+      va: valueArea(profile, this.settings.vaPct),
+      realShare: profile.total > 0 ? real / profile.total : 0,
+    };
+  }
+
+  /** TPO per session from 30-minute periods (exact: needs only high/low). */
+  private buildTpo(src: MinuteSource, keys: number[]): (TpoProfile | null)[] {
+    const s = this.settings;
+    const periods = buildBars(src, keys, TPO_PERIOD_MS, s.rowUnits, s.session);
+    const bySession = new Map<number, { t: number; h: number; l: number }[]>();
+    for (const b of periods) {
+      const arr = bySession.get(b.session) ?? [];
+      arr.push({ t: b.t, h: b.h, l: b.l });
+      bySession.set(b.session, arr);
+    }
+    return this.sessions.map((ss) => {
+      const ps = bySession.get(ss.start);
+      return ps ? buildTpo(ss.start, ps, s.rowUnits, s.vaPct) : null;
+    });
   }
 
   /** Per-bar derived data (imbalances, bar POC, max cell) — cached per Bar object. */

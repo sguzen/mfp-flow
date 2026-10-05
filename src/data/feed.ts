@@ -46,6 +46,8 @@ export interface HistoryInfo {
   wantedFrom: number;
   pages: number;
   message?: string;
+  /** history before this time comes from 30-minute candles */
+  coarseBefore?: number;
 }
 
 export interface FeedOptions {
@@ -292,12 +294,12 @@ export class MarketFeed {
     this.emit("stats");
   }
 
-  private async fetchHistory(p: { limit: number; startTime?: number; endTime?: number }): Promise<Candle[]> {
+  private async fetchHistory(p: { limit: number; startTime?: number; endTime?: number }, interval = "1m"): Promise<Candle[]> {
     const res = await withRetry(() =>
       this.stream.request<WireCandle[]>("candles.history", {
         provider: this.market.provider,
         symbol: this.market.coin,
-        interval: "1m",
+        interval,
         ...p,
       }),
     );
@@ -336,6 +338,29 @@ export class MarketFeed {
         this.history.pages++;
         this.structural = true;
         this.emit("history");
+      }
+      // Some venues keep only ~5,000 one-minute candles (Hyperliquid: ~3.5 days).
+      // Fill older sessions from 30-minute candles: exact for 30m bars and TPO
+      // periods, an approximation for volume profiles like the rest of history.
+      if (earliest > wanted && !this.stopped) {
+        const P30 = 30 * 60_000;
+        const limit30 = Math.min(1500, Math.ceil((earliest - wanted) / P30) + 2);
+        const coarse = await this.fetchHistory({ endTime: earliest - 1, limit: limit30 }, "30m");
+        let added = 0;
+        for (const c of coarse) {
+          if (c.t + P30 > earliest || this.candles.has(c.t)) continue;
+          this.candles.set(c.t, { ...c, dur: P30 });
+          added++;
+        }
+        if (added) {
+          this.history.coarseBefore = earliest;
+          this.history.earliest = Math.min(earliest, ...coarse.filter((c) => c.t + P30 <= earliest).map((c) => c.t));
+          this.history.candles = this.candles.size;
+          this.history.pages++;
+          this.history.message = `1m history ends at ${new Date(earliest).toISOString().slice(0, 16)}Z; older sessions use 30m candles`;
+          this.structural = true;
+          this.emit("history");
+        }
       }
       this.history.state = "done";
     } catch (e) {

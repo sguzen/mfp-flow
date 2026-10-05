@@ -16,6 +16,7 @@ import {
   type RowRange,
 } from "./analytics/auction";
 import { MINUTE } from "./analytics/footprint";
+import { classifyOi, oiPerBar, type OiReading } from "./analytics/oi";
 import { diagonalImbalances, stackedImbalances, type Imbalance } from "./analytics/imbalance";
 import { mergeProfiles, valueArea, type Profile, type ValueArea } from "./analytics/profile";
 import { barDelta, buildBars, buildSessions, minuteKeys, type MinuteSource, type SessionStats } from "./analytics/series";
@@ -85,6 +86,14 @@ export class ChartModel {
   composite: Composite | null = null;
   /** TPO profile per session (same indexing as `sessions`); built only in TPO view */
   tpo: (TpoProfile | null)[] = [];
+  /** per bar: open interest entering and leaving, null where unobserved */
+  oiBars: ({ open: number; close: number } | null)[] = [];
+  /** per bar: the price-vs-OI reading, null where OI is unknown */
+  oiReading: (OiReading | null)[] = [];
+  /** per session: net OI change and its reading */
+  oiSession: (OiReading | null)[] = [];
+  /** true when any OI at all is known for the loaded range */
+  hasOi = false;
   settings: ModelSettings;
   version = 0;
   buildMs = 0;
@@ -105,6 +114,10 @@ export class ChartModel {
       this.ctx = emptyCtx();
       this.composite = null;
       this.tpo = [];
+      this.oiBars = [];
+      this.oiReading = [];
+      this.oiSession = [];
+      this.hasOi = false;
       this.version++;
       return;
     }
@@ -126,11 +139,57 @@ export class ChartModel {
         this.cvd[i] = acc;
       }
     }
+    this.buildOi(src);
     this.ctx = this.buildContext();
     this.composite = this.buildComposite();
     this.tpo = s.view === "tpo" ? this.buildTpo(src, keys) : [];
     this.version++;
     this.buildMs = performance.now() - t0;
+  }
+
+  /**
+   * Open interest per bar and per session. Bars with no observation stay null
+   * all the way through, so the renderer leaves them blank rather than drawing
+   * a zero change.
+   */
+  private buildOi(src: MinuteSource) {
+    const samples = src.oi;
+    if (!samples || !samples.size) {
+      this.oiBars = [];
+      this.oiReading = [];
+      this.oiSession = [];
+      this.hasOi = false;
+      return;
+    }
+    this.hasOi = true;
+    this.oiBars = oiPerBar(samples, this.bars);
+    this.oiReading = this.bars.map((b, i) => {
+      const o = this.oiBars[i];
+      return o
+        ? classifyOi({
+            oiOpen: o.open,
+            oiClose: o.close,
+            priceOpen: b.o,
+            priceClose: b.c,
+            delta: this.realBar[i] ? b.realDelta : null,
+          })
+        : null;
+    });
+    // a session reads from the first observed OI in it to the last
+    this.oiSession = this.sessions.map((ss) => {
+      let open: number | null = null;
+      let close: number | null = null;
+      for (let i = ss.i0; i <= ss.i1; i++) {
+        const o = this.oiBars[i];
+        if (!o) continue;
+        if (open == null) open = o.open;
+        close = o.close;
+      }
+      if (open == null || close == null) return null;
+      const first = this.bars[ss.i0];
+      const last = this.bars[ss.i1];
+      return classifyOi({ oiOpen: open, oiClose: close, priceOpen: first.o, priceClose: last.c });
+    });
   }
 
   private buildContext(): Context {

@@ -18,7 +18,7 @@ import { barDelta, type SessionStats } from "../analytics/series";
 import { barSource } from "../analytics/types";
 import { tpoLetter } from "../analytics/tpo";
 import type { ChartModel } from "../model";
-import { fmtDate, fmtDateTime, fmtSigned, fmtTime, fmtVol, type TimeZoneMode } from "./format";
+import { fmtDate, fmtDateTime, fmtSigned, fmtTime, fmtUsd, fmtVol, type TimeZoneMode } from "./format";
 import { placeLabel, type Rect } from "./stack";
 import { alpha, hatchPattern, readPalette, type Palette } from "./theme";
 
@@ -31,6 +31,8 @@ export interface ChartMeta {
   subtitle: string;
   showMarkers: boolean;
   showDivergence: boolean;
+  /** which series fills the lower pane */
+  lowerPane: "cvd" | "oi";
   estDelta: boolean;
 }
 
@@ -84,6 +86,7 @@ export class FootprintChart {
     showMarkers: true,
     showDivergence: true,
     estDelta: false,
+    lowerPane: "cvd",
   };
   private pal: Palette;
   private hatch: CanvasPattern | null = null;
@@ -381,7 +384,8 @@ export class FootprintChart {
     this.drawSourceStrip(i0, i1);
     this.drawSessionSeparators(i0, i1);
     this.drawDeltaStrip(i0, i1);
-    this.drawCvd(i0, i1);
+    if (this.meta.lowerPane === "oi") this.drawOiPane(i0, i1);
+    else this.drawCvd(i0, i1);
     this.drawProfile();
     this.drawPriceAxis();
     this.drawTimeAxis(i0, i1);
@@ -1326,6 +1330,104 @@ export class FootprintChart {
       ctx.fillText(est ? "Δ incl. est" : "Δ real", ax, yMid - 7);
       ctx.fillText("Volume", ax, yMid + 8);
     } else ctx.fillText("Volume", ax, yMid);
+  }
+
+  /**
+   * Open interest: change per bar as signed bars, the level as a line.
+   *
+   * Bars with no OI observation are left blank rather than drawn at zero — a
+   * gap means "not observed", and a zero bar would claim "observed, unchanged".
+   */
+  private drawOiPane(i0: number, i1: number) {
+    const m = this.model!;
+    const ctx = this.ctx;
+    const P = this.pal;
+    const L = this.L;
+    const y0 = L.cvdY0 + 14;
+    const y1 = L.cvdY1 - 6;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(L.plotX0, L.cvdY0, L.plotX1 - L.plotX0, L.cvdY1 - L.cvdY0);
+    ctx.clip();
+
+    let dMax = 0;
+    let lvlLo = Infinity;
+    let lvlHi = -Infinity;
+    for (let i = i0; i <= i1; i++) {
+      const o = m.oiBars[i];
+      if (!o) continue;
+      dMax = Math.max(dMax, Math.abs(o.close - o.open));
+      lvlLo = Math.min(lvlLo, o.open, o.close);
+      lvlHi = Math.max(lvlHi, o.open, o.close);
+    }
+    if (!Number.isFinite(lvlLo)) {
+      ctx.restore();
+      ctx.fillStyle = P.dim;
+      ctx.font = `11px ${SANS}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText("No open-interest data for this range", L.plotX0 + 8, (L.cvdY0 + L.cvdY1) / 2);
+      return;
+    }
+    if (dMax <= 0) dMax = 1;
+    if (lvlHi === lvlLo) lvlHi = lvlLo + 1;
+
+    const mid = (y0 + y1) / 2;
+    const half = (y1 - y0) / 2;
+    const yd = (v: number) => mid - (v / dMax) * half * 0.9;
+    const yl = (v: number) => y1 - ((v - lvlLo) / (lvlHi - lvlLo)) * (y1 - y0);
+
+    ctx.strokeStyle = P.gridStrong;
+    ctx.beginPath();
+    ctx.moveTo(L.plotX0, Math.round(mid) + 0.5);
+    ctx.lineTo(L.plotX1, Math.round(mid) + 0.5);
+    ctx.stroke();
+
+    const w = Math.max(1, this.barW - 2);
+    for (let i = i0; i <= i1; i++) {
+      const o = m.oiBars[i];
+      if (!o) continue; // blank, deliberately
+      const d = o.close - o.open;
+      if (d === 0) continue;
+      const x = this.xLeft(i) + 1;
+      const yTop = Math.min(mid, yd(d));
+      // rising OI is new positions either way, so colour by price direction
+      const bar = m.bars[i];
+      ctx.fillStyle = alpha(bar.c >= bar.o ? P.buy : P.sell, d > 0 ? 0.75 : 0.4);
+      ctx.fillRect(x, yTop, w, Math.max(1, Math.abs(yd(d) - mid)));
+    }
+
+    // The level is a level: it persists between observations, so the line runs
+    // continuously once OI is known, even across bars whose own change is
+    // unknown. Only the stretch before the first observation is left out.
+    ctx.strokeStyle = alpha(P.ctxMark, 0.9);
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    let level: number | null = null;
+    let started = false;
+    for (let i = i0; i <= i1; i++) {
+      const o = m.oiBars[i];
+      if (o) level = o.close;
+      if (level == null) continue;
+      const x = this.xLeft(i) + this.barW / 2;
+      if (!started) ctx.moveTo(x, yl(level));
+      else ctx.lineTo(x, yl(level));
+      started = true;
+    }
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.restore();
+
+    ctx.fillStyle = P.dim;
+    ctx.font = `10px ${SANS}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("ΔOI per bar (bars) · open interest (line)", L.plotX0 + 6, L.cvdY0 + 3);
+    ctx.textAlign = "left";
+    ctx.fillText(fmtUsd(lvlHi), L.axisX0 + 6, y0 - 4);
+    ctx.fillText(fmtUsd(lvlLo), L.axisX0 + 6, y1 - 8);
+    ctx.fillText("OI", L.axisX0 + 6, (y0 + y1) / 2 - 5);
   }
 
   private drawCvd(i0: number, i1: number) {

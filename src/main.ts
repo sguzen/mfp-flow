@@ -10,6 +10,7 @@ import type { SessionMode } from "./analytics/session";
 import { MarketFeed, type FeedChange } from "./data/feed";
 import { DEFAULT_MARKET_ID, defaultSession, isTradFi, loadMarkets, marketLabel, type Market } from "./data/markets";
 import { loadMinutes, saveMinutes } from "./data/persist";
+import { binanceSymbol, fetchOiHistory } from "./data/binance-oi";
 import { fetchRecorder, mergeRestored } from "./data/recorder";
 import { MarketStream } from "./data/stream";
 import { allowanceShare, getAccountState, getAccounts, getQuote, inExtension, keyStatus, type AccountSummary } from "./ext/account";
@@ -41,6 +42,8 @@ interface UiSettings {
   imb: number;
   va: number;
   tz: TimeZoneMode;
+  /** which series fills the lower pane */
+  lower: "cvd" | "oi";
   /** optional recorder service base URL (see recorder/) */
   recorderUrl: string;
   theme: "dark" | "light";
@@ -61,6 +64,7 @@ const defaults: UiSettings = {
   imb: 3,
   va: 0.7,
   tz: "local",
+  lower: "cvd",
   recorderUrl: "",
   theme: "dark",
   panel: true,
@@ -195,6 +199,7 @@ stream.connect();
 let markets: Market[] = [];
 let marketsNote: string | undefined;
 let recorderNote: string | null = null;
+let oiNote: string | null = null;
 let feed: MarketFeed | null = null;
 let market: Market | null = null;
 
@@ -303,6 +308,7 @@ function rebuild() {
     showMarkers: ui.markers,
     showDivergence: ui.divergence,
     estDelta: ui.estDelta,
+    lowerPane: ui.lower,
   });
   showEmpty();
   renderPanel();
@@ -346,6 +352,7 @@ async function selectMarket(id: string) {
   model.build(null);
   chart.setModel(model);
   showEmpty();
+  oiNote = null;
   const f = new MarketFeed(stream, m, {
     priorSessions: Math.max(1, ui.days - 1),
     session: { mode: sessionModeFor(m) },
@@ -368,11 +375,26 @@ async function selectMarket(id: string) {
   });
   feed = f;
   renderPanel();
+  // Binance publishes OI history for its own perps; MFP keeps none, and
+  // Hyperliquid only exposes a current value that duplicates MFP's live one.
+  // Runs alongside start() because it is independent of the trade stream.
+  const sym = binanceSymbol(m);
+  const backfill = sym
+    ? fetchOiHistory(sym, ui.days).then((r) => {
+        if (feed !== f) return;
+        oiNote = r.note;
+        if (r.history) {
+          f.mergeOi(r.history.points.map((p) => ({ t: p.t, usd: p.usd })));
+          oiNote = `OI history from Binance, ${r.history.period} resolution (coarser than the bars).`;
+        }
+      })
+    : Promise.resolve((oiNote = "No OI history for this venue; live OI only."));
   try {
     await f.start();
   } catch (e) {
     f.error = (e as Error).message;
   }
+  void backfill.then(() => feed === f && schedule());
   if (feed === f) schedule();
 }
 
@@ -463,6 +485,14 @@ elVa.addEventListener("change", () => {
   saveUi();
   schedule();
 });
+const elLower = $<HTMLSelectElement>("optLower");
+elLower.value = ui.lower;
+elLower.addEventListener("change", () => {
+  ui.lower = elLower.value as "cvd" | "oi";
+  saveUi();
+  schedule();
+});
+
 const elRecorder = $<HTMLInputElement>("optRecorder");
 elRecorder.value = ui.recorderUrl;
 elRecorder.addEventListener("change", () => {
@@ -826,6 +856,7 @@ function renderPanel() {
 
   if (marketsNote && markets.length && f.history.state !== "done" && !model.bars.length) parts.push(`<div class="banner">${esc(marketsNote)}</div>`);
   if (recorderNote) parts.push(`<p class="note">Recorder: ${esc(recorderNote)}</p>`);
+  if (oiNote) parts.push(`<p class="note">Open interest: ${esc(oiNote)}</p>`);
 
   // --- session
   parts.push(`<h2>Current session <span class="tag">${esc(sessionModeFor(m) === "ny18" ? "18:00 ET" : "UTC day")}</span></h2>`);

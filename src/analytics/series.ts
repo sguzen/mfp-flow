@@ -17,6 +17,11 @@ export interface MinuteSource {
   fine: number;
   /** market tick (units), used for candle distribution */
   tick: number;
+  /**
+   * Open interest in USD at the close of each sampled minute. Sparse: minutes
+   * with no sample are absent, and absent means unknown, never zero.
+   */
+  oi?: Map<number, number>;
 }
 
 /** All minute keys with any data, ascending. */

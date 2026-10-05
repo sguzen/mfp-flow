@@ -87,6 +87,42 @@ export function carryForward(samples: Map<number, number>, minutes: number[]): (
   });
 }
 
+export interface BarSpan {
+  /** bar open time */
+  t: number;
+  /** bar length in ms */
+  dur: number;
+}
+
+/**
+ * OI entering and leaving each bar, from a sparse per-minute sample map.
+ *
+ * A bar with no sample of its own is null — blank, not zero — because carrying
+ * the previous level into it would show a confident "no change" where there is
+ * simply no observation. The level still carries forward underneath, so the
+ * next bar that does have a sample measures its change from the right place.
+ */
+export function oiPerBar(samples: Map<number, number>, bars: BarSpan[]): ({ open: number; close: number } | null)[] {
+  const keys = [...samples.keys()].sort((a, b) => a - b);
+  let k = 0;
+  let level: number | null = null;
+  return bars.map((bar) => {
+    const end = bar.t + bar.dur;
+    while (k < keys.length && keys[k] < bar.t) level = samples.get(keys[k++])!;
+    const entering = level;
+    let first: number | null = null;
+    let close: number | null = null;
+    while (k < keys.length && keys[k] < end) {
+      close = samples.get(keys[k++])!;
+      if (first == null) first = close;
+      level = close;
+    }
+    if (close == null) return null;
+    // with nothing before it, the bar opens at its own first sample
+    return { open: entering ?? first!, close };
+  });
+}
+
 /** OI at the open and close of a bar spanning `minutes`, from a per-minute series. */
 export function barOi(series: (number | null)[], from: number, to: number): { open: number | null; close: number | null } {
   let open: number | null = null;

@@ -77,6 +77,9 @@ export class MarketFeed {
   readonly dirty = new Set<number>();
   /** set when a change requires a full rebuild (e.g. older history arrived) */
   structural = true;
+  /** minute -> open interest (USD) observed in that minute */
+  readonly oi = new Map<number, number>();
+  oiDirty = false;
   tradesSeen = 0;
   tradesReplayed = 0;
   ready = false;
@@ -291,6 +294,36 @@ export class MarketFeed {
         if (k in e) (this.stats as any)[k] = e[k];
       }
     }
+    this.sampleOi();
+    this.emit("stats");
+  }
+
+  /**
+   * Record open interest against the minute it was observed in. OI is a level,
+   * so the last value seen in a minute is that minute's close; minutes with no
+   * observation stay absent, because absent means unknown rather than zero.
+   */
+  private sampleOi() {
+    const v = this.stats.openInterestUsd;
+    if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) return;
+    const m = minuteOf(this.stats.time ?? Date.now());
+    this.oi.set(m, v);
+    this.oiDirty = true;
+    // keep the map bounded; the chart never looks further back than history does
+    if (this.oi.size > 20_000) {
+      const cut = m - 20_000 * MINUTE;
+      for (const k of this.oi.keys()) if (k < cut) this.oi.delete(k);
+    }
+  }
+
+  /** Merge an externally sourced OI series (recorder, or Binance history). */
+  mergeOi(points: { t: number; usd: number }[]) {
+    for (const p of points) {
+      const m = minuteOf(p.t);
+      // live samples are finer than any backfill, so never overwrite one
+      if (!this.oi.has(m)) this.oi.set(m, p.usd);
+    }
+    this.oiDirty = true;
     this.emit("stats");
   }
 
@@ -403,6 +436,7 @@ export class MarketFeed {
       fine: this.book.fine,
       tick: this.tick || this.book.fine,
       isReal: (m) => cov.isMinuteReal(m),
+      oi: this.oi,
     };
   }
 

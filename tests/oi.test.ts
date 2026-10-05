@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barOi, carryForward, classifyOi, OI_DEAD_ZONE } from "../src/analytics/oi";
+import { barOi, carryForward, classifyOi, OI_DEAD_ZONE, oiPerBar } from "../src/analytics/oi";
 
 /** 1,000,000 of OI makes the 0.1% dead zone exactly 1,000. */
 const base = { oiOpen: 1_000_000, priceOpen: 100, priceClose: 101 };
@@ -110,5 +110,43 @@ describe("barOi", () => {
   });
   it("does not run past the end of the series", () => {
     expect(barOi(series, 4, 99)).toEqual({ open: 130, close: 130 });
+  });
+});
+
+describe("oiPerBar", () => {
+  const M = 60_000;
+  const bars = [0, 5, 10, 15].map((i) => ({ t: i * M, dur: 5 * M }));
+
+  it("measures each bar from the level it entered with", () => {
+    // samples at minutes 1, 6 and 16; bar 10-15 has none
+    const got = oiPerBar(new Map([[1 * M, 100], [6 * M, 120], [16 * M, 150]]), bars);
+    expect(got[0]).toEqual({ open: 100, close: 100 }); // first bar, nothing before it
+    expect(got[1]).toEqual({ open: 100, close: 120 }); // entered at 100
+    expect(got[2]).toBeNull(); // no sample of its own
+    expect(got[3]).toEqual({ open: 120, close: 150 }); // level carried across the blank bar
+  });
+
+  // the point of the exercise: a bar with no observation must not look like a
+  // bar that was observed and did not move
+  it("is null for a bar with no sample, not a zero change", () => {
+    const got = oiPerBar(new Map([[1 * M, 100]]), bars);
+    expect(got[1]).toBeNull();
+    expect(got[2]).toBeNull();
+    expect(got[3]).toBeNull();
+  });
+
+  it("uses the last sample in a bar as its close", () => {
+    const got = oiPerBar(new Map([[0, 10], [1 * M, 20], [2 * M, 30]]), [{ t: 0, dur: 5 * M }]);
+    expect(got[0]).toEqual({ open: 10, close: 30 });
+  });
+
+  it("ignores samples after the last bar", () => {
+    const got = oiPerBar(new Map([[1 * M, 100], [99 * M, 999]]), [{ t: 0, dur: 5 * M }]);
+    expect(got).toEqual([{ open: 100, close: 100 }]);
+  });
+
+  it("has nothing to say with no samples or no bars", () => {
+    expect(oiPerBar(new Map(), bars)).toEqual([null, null, null, null]);
+    expect(oiPerBar(new Map([[0, 1]]), [])).toEqual([]);
   });
 });

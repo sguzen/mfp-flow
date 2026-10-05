@@ -1906,6 +1906,10 @@ export class FootprintChart {
           if (b.estVol > 0) lines.push(`<span class="est">est vol ${fmtVol(b.estVol)} · close-location Δ ~${fmtSigned(b.estDelta)}</span>`);
           lines.push(`CVD ${fmtSigned(cvd)}`);
         }
+        // context, not a signal: what the position base did while price moved
+        const oi = m.oiReading[i];
+        if (oi) lines.push(`OI ${fmtSigned(Math.round(oi.deltaOiPct * 1000) / 10)}% · ${oi.label}`);
+        else if (m.hasOi) lines.push(`<span class="est">OI not observed for this bar</span>`);
       }
     }
     if (!lines.length) {

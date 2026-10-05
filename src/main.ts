@@ -5,6 +5,7 @@
  */
 import "./style.css";
 import { locationVsValue, valueRelation } from "./analytics/auction";
+import type { OiReading } from "./analytics/oi";
 import { decimalsFor, formatUnits, PRICE_SCALE } from "./analytics/price";
 import type { SessionMode } from "./analytics/session";
 import { MarketFeed, type FeedChange } from "./data/feed";
@@ -912,9 +913,14 @@ function renderPanel() {
       const pv = k > 0 ? (ui.view === "tpo" ? model.tpo[k - 1]?.va ?? null : model.sessions[k - 1].va) : null;
       if (!va) continue;
       const rel = pv ? valueRelation(va, pv).replace("overlapping-", "ovl ") : "—";
-      rowsHtml.push(`<tr><td>${esc(fmtDate(ss.start, tz))}${k === n - 1 ? " •" : ""}</td><td class="poc-c">${rowLo(va.poc)}</td><td class="va-c">${rowHi(va.vah)}<br>${rowLo(va.val)}</td><td>${esc(rel)}</td></tr>`);
+      const oiR: OiReading | null = model.oiSession[k] ?? null;
+      // blank, not zero: a session with no OI observed says nothing about it
+      const oiCell = oiR
+        ? `<span class="${oiR.deltaOi >= 0 ? "buy-c" : "sell-c"}">${fmtSigned(Math.round(oiR.deltaOiPct * 1000) / 10)}%</span><div class="sub">${esc(oiR.label)}</div>`
+        : `<span class="dim">—</span>`;
+      rowsHtml.push(`<tr><td>${esc(fmtDate(ss.start, tz))}${k === n - 1 ? " •" : ""}</td><td class="poc-c">${rowLo(va.poc)}</td><td class="va-c">${rowHi(va.vah)}<br>${rowLo(va.val)}</td><td>${esc(rel)}</td><td>${oiCell}</td></tr>`);
     }
-    parts.push(`<h2>Sessions${ui.view === "tpo" ? " (TPO value)" : ""}</h2><table class="sess"><thead><tr><th>Day</th><th>POC</th><th>VAH / VAL</th><th>Value</th></tr></thead><tbody>${rowsHtml.join("")}</tbody></table>`);
+    parts.push(`<h2>Sessions${ui.view === "tpo" ? " (TPO value)" : ""}</h2><table class="sess"><thead><tr><th>Day</th><th>POC</th><th>VAH / VAL</th><th>Value</th><th>ΔOI</th></tr></thead><tbody>${rowsHtml.join("")}</tbody></table>`);
   }
   if (ui.rightProfile === "composite" && model.composite?.va) {
     const c = model.composite;

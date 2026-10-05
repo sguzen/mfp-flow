@@ -5,3 +5,4 @@ dist/
 screenshots/*.tmp.png
 CLAUDE.md
 PLAN.md
+dist-mcp/

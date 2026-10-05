@@ -48,11 +48,38 @@ Recorded trades are kept in your browser (IndexedDB), so reopening the page keep
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 62 unit tests (value area, TPO, composite, bucketing, footprint, sessions, auction context)
+npm test           # unit tests (value area, TPO, composite, bucketing, footprint, sessions, auction context, links, MCP shaping)
 npm run smoke      # 20 s against the live stream: trade counts, dedupe, trade-vs-candle reconciliation, POC/VA
 npm run build      # static site in dist/, deployable to any static host (relative paths)
 npm run markets    # refresh the bundled market list
+npm run mcp:smoke  # build the MCP server and exercise every tool against live data
 ```
+
+## Ask it questions: the MCP server
+
+The same analytics are exposed over [MCP](https://modelcontextprotocol.io), so Claude Code, Claude Desktop or any MCP client can ask about auction structure on any MFP market. It needs no API key and it is **read-only** — nothing in this project places, modifies or cancels an order.
+
+```bash
+npm install && npm run mcp:build
+claude mcp add mfp-flow -- node "$PWD/dist-mcp/mfp-flow-mcp.js"
+```
+
+Once published to npm this becomes `claude mcp add mfp-flow -- npx -y mfp-flow-mcp`. Then `/mcp` lists the server and four tools:
+
+| Tool | Answers |
+| - | - |
+| `list_markets(query?)` | which markets exist, with aliases like NAS100 |
+| `get_session_profiles(market, days, row?, session?)` | per-session POC, value area, high/low, volume, real share, value migration |
+| `get_tpo(market, days, row?, session?)` | TPO POC and value area, initial balance, range extension, single prints, tails, poor highs/lows |
+| `get_levels(market, days, session?)` | last price, location vs value, prior levels, naked POCs with distance, composite value, failed auctions |
+
+Try:
+
+- *"Where are NAS100's naked POCs and is value migrating higher this week?"*
+- *"Did BTC's initial balance extend today, and did it leave a poor high?"*
+- *"Compare where gold is trading against its last five days of value areas."*
+
+Every response carries a `data_quality` block saying what is exact and what is inferred: TPO is exact for any past session, volume is exact but its buy/sell split is only real for the share recorded live, and aggressor delta exists only from the moment the server started. Prices come back as decimal strings at the market's tick, and a short `summary` line is included so an agent can quote one sentence without re-deriving anything. The numbers match the web app for the same settings.
 
 ## How it uses MFP
 

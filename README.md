@@ -2,6 +2,14 @@
 
 **Live footprint, session volume profile and real aggressor delta for every [MyFundedPerps](https://myfundedperpetuals.com) market**, built on MFP's public market-data stream. No API key, no backend, no account needed. Open the page and read the auction.
 
+### Three surfaces
+
+| | | |
+| - | - | - |
+| **Web app** | [**sguzen.github.io/mfp-flow**](https://sguzen.github.io/mfp-flow/) | Footprint, Profiles and TPO on any MFP market. Nothing to install. |
+| **Chrome extension** | [**download the latest release**](https://github.com/sguzen/mfp-flow/releases/latest) | The same chart beside the MFP terminal, plus your account's entry, stop, target, liquidation and both breach lines. Read-only. |
+| **MCP server** | `npm run mcp:build` | Lets Claude or any MCP client ask about auction structure: naked POCs, value migration, initial balance, failed auctions. |
+
 ![BTC 5m footprint with session profile](docs/screenshots/btc-5m-dark.png)
 
 ## Three views
@@ -205,6 +213,33 @@ only), which is why `/minutes` serves open CORS.
 expose it beyond loopback, put it behind something that terminates TLS, and note that
 `/minutes` is readable by anyone who can reach it -- it carries no account data, only
 public trades. Nothing is hosted on your behalf.
+
+## Where the data comes from
+
+Everything on the chart is MFP's, with two deliberate exceptions that MFP does not publish.
+
+| Host | What it provides | Whose data |
+| - | - | - |
+| `wss://api-stream.myfundedperpetuals.com` | trades, 1m candles, marketStats (mark, funding, **live open interest**) | MyFundedPerps |
+| `https://developers.myfundedperpetuals.com` | the market list (`/v1/markets`) | MyFundedPerps |
+| `https://fapi.binance.com` | **open-interest history** | Binance, called directly |
+| `wss://fstream.binance.com` | **forced liquidations** | Binance, called directly |
+
+MFP's stream carries live OI but keeps no history, and carries no liquidation data at all.
+Those two gaps are the only reason the page talks to Binance, and it only does so for
+**Binance-provider markets** — the ones whose book MFP mirrors from Binance. Hyperliquid
+markets (NAS100, Gold, S&P 500) never trigger a Binance request; they show live OI only and
+say so, and show no liquidation UI at all.
+
+Note that a market id like `binance|BTCUSDT` is **MFP's own identifier**, naming which venue
+MFP mirrors. Seeing it in a link does not mean a request went to Binance.
+
+If you would rather the page spoke only to MFP, turn off **Liquidation bubbles** in Display
+and leave the lower pane on CVD — the ΔOI pane still works from MFP's live OI, just without
+backfilled history.
+
+The extension additionally calls `developers.` or `sandbox.myfundedperpetuals.com` for your
+account, and only when you have given it a key.
 
 ## How it uses MFP
 

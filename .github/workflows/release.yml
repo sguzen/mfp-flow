@@ -11,6 +11,12 @@ on:
 permissions:
   contents: write
 
+# a tag push can deliver more than once; let one publish finish rather than
+# racing a second against it
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -43,6 +49,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" mfp-flow-extension.zip \
-            --title "mfp·flow ${GITHUB_REF_NAME}" \
-            --notes-file .github/release-notes.md
+          # idempotent: the first delivery creates the release, any repeat
+          # refreshes the asset instead of failing on "already exists"
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "release ${GITHUB_REF_NAME} exists; replacing the asset"
+            gh release upload "${GITHUB_REF_NAME}" mfp-flow-extension.zip --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" mfp-flow-extension.zip \
+              --title "mfp·flow ${GITHUB_REF_NAME}" \
+              --notes-file .github/release-notes.md
+          fi

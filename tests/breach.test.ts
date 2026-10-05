@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breachLines, breachPrice, feeRate, netPosition, type PositionLike } from "../src/risk/breach";
-
-const CRYPTO_FEE = 0.0003;
+import { breachLines, breachPrice, exitCost, feeRate, netPosition, type PositionLike } from "../src/risk/breach";
 
 describe("feeRate", () => {
   it("matches the published commission per fill", () => {
@@ -36,41 +34,36 @@ describe("netPosition", () => {
 });
 
 describe("breachPrice", () => {
-  // Worked by hand: q=2, m=100, room=50, f=0.0003.
-  //   long  P = (2·100 − 50) / (2 × 0.9997) = 150 / 1.9994 = 75.0225067…
-  //   short P = (2·100 + 50) / (2 × 1.0003) = 250 / 2.0006 = 124.9625112…
-  const base = { size: 2, mark: 100, fee: CRYPTO_FEE, room: 50 };
+  // Equity is balance plus unrealised PnL, so the floor is reached after a move
+  // of room/size: q=2, m=100, room=50 -> 25 of price.
+  const base = { size: 2, mark: 100, room: 50 };
 
   it("solves the long floor", () => {
-    const r = breachPrice({ ...base, side: "long" });
-    expect(r.status).toBe("ok");
-    expect((r as { price: number }).price).toBeCloseTo(75.0225067, 6);
+    expect(breachPrice({ ...base, side: "long" })).toEqual({ status: "ok", price: 75 });
   });
   it("solves the short floor", () => {
-    const r = breachPrice({ ...base, side: "short" });
-    expect(r.status).toBe("ok");
-    expect((r as { price: number }).price).toBeCloseTo(124.9625112, 6);
+    expect(breachPrice({ ...base, side: "short" })).toEqual({ status: "ok", price: 125 });
   });
 
-  // With no commission the arithmetic is exact, which pins the shape of it.
-  it("fee-exempt gives the clean numbers", () => {
-    expect(breachPrice({ ...base, side: "long", fee: 0 })).toEqual({ status: "ok", price: 75 });
-    expect(breachPrice({ ...base, side: "short", fee: 0 })).toEqual({ status: "ok", price: 125 });
+  // The real check: MFP's own terminal showed Loss Limit 124.61 on this
+  // position, which is what the line has to agree with.
+  it("agrees with MFP's displayed Loss Limit on a real position", () => {
+    const r = breachPrice({ side: "short", size: 1035.11, mark: 120.772, room: 3968 }) as { price: number };
+    expect(r.price).toBeCloseTo(124.6055, 3);
+    expect(Number(r.price.toFixed(2))).toBe(124.61);
   });
 
-  // The property that matters: at the returned price, equity has fallen by
-  // exactly the room, exit fee included.
-  it("the solved price loses exactly the room, exit fee included", () => {
-    for (const [q, m, room, f] of [
-      [2, 100, 50, CRYPTO_FEE],
-      [10, 30_000, 500, 0.00005],
-      [0.5, 86_220, 1200, CRYPTO_FEE],
-      [100_000, 1.0825, 40, 0.000025], // one standard FX lot
+  it("the solved price loses exactly the room", () => {
+    for (const [q, m, room] of [
+      [2, 100, 50],
+      [10, 30_000, 500],
+      [1035.11, 120.772, 3968],
+      [100_000, 1.0825, 40],
     ] as const) {
-      const long = breachPrice({ side: "long", size: q, mark: m, room, fee: f }) as { price: number };
-      expect(q * (long.price - m) - f * q * long.price).toBeCloseTo(-room, 6);
-      const short = breachPrice({ side: "short", size: q, mark: m, room, fee: f }) as { price: number };
-      expect(q * (m - short.price) - f * q * short.price).toBeCloseTo(-room, 6);
+      const long = breachPrice({ side: "long", size: q, mark: m, room }) as { price: number };
+      expect(q * (long.price - m)).toBeCloseTo(-room, 6);
+      const short = breachPrice({ side: "short", size: q, mark: m, room }) as { price: number };
+      expect(q * (m - short.price)).toBeCloseTo(-room, 6);
     }
   });
 
@@ -90,11 +83,10 @@ describe("breachPrice", () => {
   });
 
   it("a long that cannot reach the floor even at zero is unreachable", () => {
-    // max loss on the position is q·m = 100, but the room is 200
-    expect(breachPrice({ side: "long", size: 1, mark: 100, room: 200, fee: CRYPTO_FEE }).status).toBe("unreachable");
+    expect(breachPrice({ side: "long", size: 1, mark: 100, room: 200 }).status).toBe("unreachable");
   });
   it("a short can always reach its floor, since price is unbounded above", () => {
-    expect(breachPrice({ side: "short", size: 1, mark: 100, room: 200, fee: CRYPTO_FEE }).status).toBe("ok");
+    expect(breachPrice({ side: "short", size: 1, mark: 100, room: 200 }).status).toBe("ok");
   });
 
   it("has nothing to say without a position, a mark or a room", () => {
@@ -102,6 +94,23 @@ describe("breachPrice", () => {
     expect(breachPrice({ ...base, side: "long", room: null }).status).toBe("none");
     expect(breachPrice({ ...base, side: "long", mark: 0 }).status).toBe("none");
     expect(breachPrice({ ...base, side: "long", room: Number.NaN }).status).toBe("none");
+  });
+});
+
+describe("exitCost", () => {
+  // Not drawn, but it is what the commission cushion is worth knowing as.
+  it("sits inside the breach line, by the commission", () => {
+    const breach = (breachPrice({ side: "short", size: 1035.11, mark: 120.772, room: 3968 }) as { price: number }).price;
+    const exit = exitCost({ side: "short", size: 1035.11, mark: 120.772, room: 3968, fee: 0.0003 })!;
+    expect(exit).toBeLessThan(breach);
+    expect(breach - exit).toBeCloseTo(0.0374, 3);
+  });
+  it("equals the breach line when there is no commission", () => {
+    const b = (breachPrice({ side: "long", size: 2, mark: 100, room: 50 }) as { price: number }).price;
+    expect(exitCost({ side: "long", size: 2, mark: 100, room: 50, fee: 0 })).toBeCloseTo(b, 10);
+  });
+  it("has nothing to say without a position", () => {
+    expect(exitCost({ side: "long", size: 0, mark: 100, room: 50, fee: 0.0003 })).toBeNull();
   });
 });
 
@@ -114,10 +123,9 @@ describe("breachLines", () => {
       maxDrawdownRoom: 150,
       assetClass: "crypto",
     });
-    // net long 2, so the daily line matches the hand-worked long case
-    expect((r.daily as { price: number }).price).toBeCloseTo(75.0225067, 6);
-    // the further floor sits further away
-    expect((r.maxDrawdown as { price: number }).price).toBeLessThan((r.daily as { price: number }).price);
+    // net long 2: daily 100 - 25 = 75, drawdown 100 - 75 = 25
+    expect(r.daily).toEqual({ status: "ok", price: 75 });
+    expect(r.maxDrawdown).toEqual({ status: "ok", price: 25 });
   });
   it("gives no lines for a market that is flat or hedged out", () => {
     const r = breachLines({
@@ -130,16 +138,10 @@ describe("breachLines", () => {
     expect(r.daily.status).toBe("none");
     expect(r.maxDrawdown.status).toBe("none");
   });
-  it("honours a fee-exempt policy", () => {
-    const r = breachLines({
-      positions: [{ side: "long", size: 2 }],
-      mark: 100,
-      dailyRoom: 50,
-      maxDrawdownRoom: null,
-      assetClass: "crypto",
-      feeExempt: true,
-    });
-    expect(r.daily).toEqual({ status: "ok", price: 75 });
-    expect(r.maxDrawdown.status).toBe("none");
+  it("is unaffected by the fee policy, which no longer moves the line", () => {
+    const of = (feeExempt: boolean) =>
+      breachLines({ positions: [{ side: "long", size: 2 }], mark: 100, dailyRoom: 50, maxDrawdownRoom: null, assetClass: "crypto", feeExempt });
+    expect(of(true).daily).toEqual(of(false).daily);
+    expect(of(true).daily).toEqual({ status: "ok", price: 75 });
   });
 });

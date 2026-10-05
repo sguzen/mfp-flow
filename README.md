@@ -128,6 +128,14 @@ move too. The maths is in `src/risk/breach.ts` with hand-computed tests; floors 
 inclusive, positions on one market are netted first, and a long that cannot reach its
 floor even at zero is reported as unreachable rather than drawn at a nonsense price.
 
+The line is where **equity touches the floor** — `mark ± room/size` — which is what MFP
+itself breaches on. It was checked against the terminal: on a 1035.11 SOL short at a
+mark of 120.772 with $3,968 of daily room, MFP showed a Loss Limit of $124.61 and this
+gives $124.6055. Closing a position at that price costs commission, so a real exit
+lands a little short of the floor — about $0.037 on that position. That cushion is
+reported by `exitCost()` rather than folded into the line, so the line keeps meaning
+the same thing the platform's does.
+
 ## How it uses MFP
 
 - `wss://api-stream.myfundedperpetuals.com/v1/market-data`. One multiplexed connection carries `trades`, `marketStats` (mark, OI, funding) and live `candles`. It also uses `candles.history` paging for backfill, reconnects with backoff and jitter, resubscribes, replaces itself on `draining`, and backfills gaps after reconnects.

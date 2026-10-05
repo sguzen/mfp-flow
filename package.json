@@ -1,0 +1,26 @@
+{
+  "name": "mfp-flow",
+  "version": "1.0.0",
+  "description": "Live footprint + session volume profile on MyFundedPerps public market data",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "smoke": "tsx scripts/smoke.ts",
+    "screenshot": "tsx scripts/screenshot.ts"
+  },
+  "keywords": [],
+  "author": "SiS",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  },
+  "private": true,
+  "type": "module"
+}

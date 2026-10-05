@@ -54,6 +54,8 @@ interface Layout {
   timeY1: number;
 }
 
+/** box height reserved for a 9px TPO extreme label, 2px of padding included */
+const TPO_LAB_H = 11;
 const RIGHT_PAD = 36;
 const MONO = "'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
 const SANS = "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif";
@@ -824,17 +826,27 @@ export class FootprintChart {
         ctx.fillStyle = alpha(P.ctxMark, 0.85);
         ctx.fillRect(x0 - 4, yA, 2, yB - yA);
       }
-      // poor extremes
-      ctx.font = `600 9px ${SANS}`;
-      ctx.textAlign = "left";
-      ctx.fillStyle = P.ctxMark;
-      if (t.poorHigh && k !== m.sessions.length - 1) {
-        ctx.textBaseline = "bottom";
-        ctx.fillText("poor high", x0, this.yOf((t.hi + 1) * row) - 2);
-      }
-      if (t.poorLow && k !== m.sessions.length - 1) {
-        ctx.textBaseline = "top";
-        ctx.fillText("poor low", x0, this.yOf(t.lo * row) + 2);
+      // Poor extremes. Plain text rather than pills, to stay light against the
+      // letter grid, but reserved through the same stacker: both labels hang
+      // off the same session's left edge, so a session whose range is tight on
+      // screen puts "poor high" and "poor low" on the same pixels. (Adjacent
+      // sessions cannot collide: barW floors at 2, so a session is always
+      // wider than the text.)
+      if (k !== m.sessions.length - 1 && (t.poorHigh || t.poorLow)) {
+        ctx.font = `600 9px ${SANS}`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = P.ctxMark;
+        const mark = (text: string, py: number, dir: 1 | -1) => {
+          const want = py + dir * (TPO_LAB_H / 2 + 2);
+          const cy = this.reserveLabel(x0, x0 + ctx.measureText(text).width, want, dir, TPO_LAB_H);
+          if (cy === null) return;
+          if (Math.abs(cy - want) > 1) this.leader(x0 + 2, py, cy, TPO_LAB_H, P.ctxMark);
+          ctx.fillStyle = P.ctxMark;
+          ctx.fillText(text, x0, cy);
+        };
+        if (t.poorHigh) mark("poor high", this.yOf((t.hi + 1) * row), -1);
+        if (t.poorLow) mark("poor low", this.yOf(t.lo * row), 1);
       }
     }
   }
@@ -997,41 +1009,57 @@ export class FootprintChart {
   }
 
   /**
-   * Draw a context label centred on (x, y), stacked clear of the labels already
-   * placed this frame by sliding along `dir` (-1 up, 1 down) away from the
-   * anchor. Returns false, and draws nothing, when there is no room left in the
-   * main plot — the context panel lists every marker, so the chart drops the
-   * label rather than printing a pile of unreadable boxes.
+   * Reserve an `h`-tall label box spanning x0..x1 and centred on `y`, stacked
+   * clear of the labels already placed this frame by sliding along `dir` (-1
+   * up, 1 down) away from the anchor. Returns the centre y to draw at, or null
+   * when the stack runs out of room inside the main plot — the context panel
+   * lists every marker, so the chart drops a label rather than printing a pile
+   * of unreadable text.
    */
+  private reserveLabel(x0: number, x1: number, y: number, dir: 1 | -1, h: number): number | null {
+    const L = this.L;
+    const spot = placeLabel(
+      { x0, x1, y0: y - h / 2, y1: y + h / 2 },
+      this.taken,
+      dir,
+      { gap: 2, minY: L.mainY0 + 1, maxY: L.mainY1 - 1 },
+    );
+    if (!spot.fits) return null;
+    this.taken.push({ x0, x1, y0: spot.y0, y1: spot.y1 });
+    return spot.y0 + h / 2;
+  }
+
+  /**
+   * Faint dotted line from a label that had to move back to the price it marks,
+   * so a shifted label is never read as marking the level it now sits on.
+   * Callers draw it only when the label actually shifted.
+   */
+  private leader(x: number, anchorY: number, labelY: number, h: number, color: string) {
+    const ctx = this.ctx;
+    const near = labelY + (labelY > anchorY ? -h / 2 : h / 2);
+    ctx.strokeStyle = alpha(color, 0.45);
+    ctx.setLineDash([1, 2]);
+    ctx.beginPath();
+    ctx.moveTo(Math.round(x) + 0.5, anchorY);
+    ctx.lineTo(Math.round(x) + 0.5, near);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  /** Boxed context label centred on (x, y). False when it could not be placed. */
   private pill(x: number, y: number, text: string, color: string, dir: 1 | -1 = 1): boolean {
     const ctx = this.ctx;
     const L = this.L;
     ctx.font = `10px ${SANS}`;
     const w = ctx.measureText(text).width + 8;
     const px = Math.max(L.plotX0 + 2, Math.min(L.plotX1 - w - 2, x - w / 2));
-    const spot = placeLabel(
-      { x0: px, x1: px + w, y0: y - 7, y1: y + 7 },
-      this.taken,
-      dir,
-      { gap: 2, minY: L.mainY0 + 1, maxY: L.mainY1 - 1 },
-    );
-    if (!spot.fits) return false;
-    this.taken.push({ x0: px, x1: px + w, y0: spot.y0, y1: spot.y1 });
-    const cy = spot.y0 + 7;
-    // a label shifted off its anchor gets a leader line back to it
-    if (Math.abs(cy - y) > 1) {
-      ctx.strokeStyle = alpha(color, 0.45);
-      ctx.setLineDash([1, 2]);
-      ctx.beginPath();
-      ctx.moveTo(Math.round(x) + 0.5, y);
-      ctx.lineTo(Math.round(x) + 0.5, dir === 1 ? spot.y0 : spot.y1);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
+    const cy = this.reserveLabel(px, px + w, y, dir, 14);
+    if (cy === null) return false;
+    if (Math.abs(cy - y) > 1) this.leader(x, y, cy, 14, color);
     ctx.fillStyle = alpha(this.pal.panel, 0.92);
-    ctx.fillRect(px, spot.y0, w, 14);
+    ctx.fillRect(px, cy - 7, w, 14);
     ctx.strokeStyle = alpha(color, 0.8);
-    ctx.strokeRect(px + 0.5, spot.y0 + 0.5, w - 1, 13);
+    ctx.strokeRect(px + 0.5, cy - 6.5, w - 1, 13);
     ctx.fillStyle = color;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";

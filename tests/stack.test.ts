@@ -99,6 +99,27 @@ describe("placeLabel", () => {
     expect(placeLabel(pill(10), [], -1, { minY: 20 })).toEqual({ y0: 3, y1: 17, fits: false });
   });
 
+  it("stacks labels of different heights against each other", () => {
+    // a 14-tall pill holds 93..107; an 11-tall TPO label wanting the same
+    // centre clears it upward past the pill's top: 93 - 2 - 11 = 80
+    const pillBox: Rect = { x0: 100, x1: 200, y0: 93, y1: 107 };
+    const want: Rect = { x0: 100, x1: 200, y0: 94.5, y1: 105.5 };
+    expect(placeLabel(want, [pillBox], -1)).toEqual({ y0: 80, y1: 91, fits: true });
+  });
+
+  it("stacks two 11px labels at a 13px pitch", () => {
+    const taken: Rect[] = [];
+    const ys: number[] = [];
+    for (let k = 0; k < 3; k++) {
+      // an 11-tall label centred on 100
+      const p = placeLabel({ x0: 100, x1: 160, y0: 94.5, y1: 105.5 }, taken, -1);
+      ys.push(p.y0);
+      taken.push({ x0: 100, x1: 160, y0: p.y0, y1: p.y1 });
+    }
+    // 11 tall + 2 gap
+    expect(ys).toEqual([94.5, 81.5, 68.5]);
+  });
+
   it("honours a custom gap", () => {
     // blocker 43..57, gap 6 -> 57 + 6 = 63
     expect(placeLabel(pill(50), [pill(50)], 1, { gap: 6 }).y0).toBe(63);

@@ -209,3 +209,10 @@ body.panel-hidden .panel { display: none; }
   .ctrl label { display: none; }
   .brand { display: none; }
 }
+
+/* sessions table */
+.sess { width: 100%; border-collapse: collapse; font-size: 12px; }
+.sess th { text-align: left; color: var(--c-faint); font-weight: 500; font-size: 10.5px; padding: 0 4px 4px 0; }
+.sess td { padding: 4px 4px 4px 0; border-top: 1px solid var(--c-border); vertical-align: top; font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.sess td:first-child { font-family: inherit; color: var(--c-dim); white-space: nowrap; }
+.sess td:last-child { color: var(--c-dim); font-family: inherit; }

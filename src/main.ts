@@ -11,13 +11,16 @@ import { MarketFeed, type FeedChange } from "./data/feed";
 import { DEFAULT_MARKET_ID, defaultSession, isTradFi, loadMarkets, marketLabel, type Market } from "./data/markets";
 import { loadMinutes, saveMinutes } from "./data/persist";
 import { MarketStream } from "./data/stream";
-import { ChartModel } from "./model";
+import { ChartModel, type ViewMode } from "./model";
 import { FootprintChart } from "./render/chart";
-import { fmtDateTime, fmtSigned, fmtTime, fmtUsd, fmtVol, type TimeZoneMode } from "./render/format";
+import { fmtDate, fmtDateTime, fmtSigned, fmtTime, fmtUsd, fmtVol, type TimeZoneMode } from "./render/format";
 
 // ---------- persisted UI settings (best effort) ----------
 interface UiSettings {
   market: string;
+  view: ViewMode;
+  days: number;
+  rightProfile: "session" | "composite";
   tf: number;
   rowByMarket: Record<string, number>;
   sessionByMarket: Record<string, SessionMode>;
@@ -33,6 +36,9 @@ interface UiSettings {
 const KEY = "mfp-flow:ui:v1";
 const defaults: UiSettings = {
   market: DEFAULT_MARKET_ID,
+  view: "footprint",
+  days: 3,
+  rightProfile: "session",
   tf: 5,
   rowByMarket: {},
   sessionByMarket: {},
@@ -80,6 +86,9 @@ function marketFromHash(markets: Market[]): string | null {
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const elMarket = $<HTMLSelectElement>("market");
 const elTf = $<HTMLDivElement>("tf");
+const elView = $<HTMLDivElement>("view");
+const elDays = $<HTMLSelectElement>("days");
+const elRprof = $<HTMLSelectElement>("rprof");
 const elRow = $<HTMLSelectElement>("row");
 const elSession = $<HTMLSelectElement>("session");
 const elMarkers = $<HTMLInputElement>("optMarkers");
@@ -117,8 +126,11 @@ const model = new ChartModel({
   vaPct: ui.va,
   imbRatio: ui.imb,
   estDelta: ui.estDelta,
-  nakedLookback: 5,
+  nakedLookback: ui.days,
   divLookback: 12,
+  view: ui.view,
+  rightProfile: ui.rightProfile,
+  compositeDays: ui.days,
 });
 
 // ---------- status ----------
@@ -146,6 +158,11 @@ function schedule(kind?: FeedChange) {
   }, wait);
 }
 
+/** Row size is remembered per market and per view family (footprint vs profiles/TPO). */
+function rowKey(m: Market): string {
+  return ui.view === "footprint" ? m.market_id : `${m.market_id}|profile`;
+}
+
 function rowOptions(): number[] {
   return feed?.buckets?.options ?? [];
 }
@@ -157,8 +174,13 @@ function syncRowSelect() {
     elRow.disabled = true;
     return;
   }
-  let row = ui.rowByMarket[market.market_id];
-  if (!row || !opts.includes(row)) row = feed.buckets.defaultUnits;
+  const key = rowKey(market);
+  let row = ui.rowByMarket[key];
+  if (!row || !opts.includes(row)) {
+    const d = feed.buckets.defaultUnits;
+    // Profiles/TPO read better with coarser rows (BTC 10 -> 50, NAS100 5 -> 25)
+    row = ui.view === "footprint" ? d : opts.find((o) => o >= d * 5) ?? opts[opts.length - 1];
+  }
   const sig = opts.join(",") + "|" + row;
   if (elRow.dataset.sig !== sig) {
     elRow.innerHTML = opts.map((o) => `<option value="${o}"${o === row ? " selected" : ""}>${formatUnits(o, decimalsFor(o))}</option>`).join("");
@@ -184,6 +206,10 @@ function rebuild() {
   model.settings.tfMin = ui.tf;
   model.settings.vaPct = ui.va;
   model.settings.estDelta = ui.estDelta;
+  model.settings.view = ui.view;
+  model.settings.rightProfile = ui.rightProfile;
+  model.settings.compositeDays = ui.days;
+  model.settings.nakedLookback = ui.days;
   model.build(src);
   chart.setModel(model);
   chart.setMeta({
@@ -192,7 +218,7 @@ function rebuild() {
     realSince: feed.realSince(),
     tz: ui.tz,
     title: marketLabel(market),
-    subtitle: `${market.provider} · ${ui.tf}m · row ${formatUnits(model.settings.rowUnits, decimalsFor(model.settings.rowUnits))}`,
+    subtitle: `${market.provider} · ${ui.view === "tpo" ? "TPO 30m" : `${ui.tf}m`} · row ${formatUnits(model.settings.rowUnits, decimalsFor(model.settings.rowUnits))}`,
     showMarkers: ui.markers,
     showDivergence: ui.divergence,
     estDelta: ui.estDelta,
@@ -228,12 +254,12 @@ async function selectMarket(id: string) {
   elSession.value = sessionModeFor(m);
   history.replaceState(null, "", `#${encodeURIComponent(m.market_id)}`);
   document.title = `${marketLabel(m)} · mfp·flow`;
-  chart.resetView(innerWidth < 600 ? 44 : 84);
+  chart.resetView(defaultBarW());
   model.build(null);
   chart.setModel(model);
   showEmpty();
   const f = new MarketFeed(stream, m, {
-    priorSessions: 2,
+    priorSessions: Math.max(1, ui.days - 1),
     session: { mode: sessionModeFor(m) },
     persist: {
       load: (mid, fine, since) => loadMinutes(mid, fine, since),
@@ -259,9 +285,44 @@ function setTf(v: number) {
   saveUi();
   for (const b of elTf.querySelectorAll("button")) b.setAttribute("aria-checked", String(Number(b.dataset.v) === v));
   for (const b of elTf.querySelectorAll("button")) b.setAttribute("role", "radio");
-  chart.resetView(innerWidth < 600 ? 44 : v >= 15 ? 110 : 84);
+  chart.resetView(defaultBarW());
   schedule();
 }
+
+/** Bar width that fits the view: footprint shows cells, Profiles/TPO fit ~3.5 sessions. */
+function defaultBarW(): number {
+  if (ui.view === "footprint") return innerWidth < 600 ? 44 : ui.tf >= 15 ? 110 : 84;
+  const plotW = Math.max(300, host.clientWidth - 300);
+  const perSession = 1440 / ui.tf;
+  return Math.max(0.6, Math.min(40, plotW / (perSession * 3.5)));
+}
+
+function setView(v: ViewMode) {
+  ui.view = v;
+  saveUi();
+  for (const b of elView.querySelectorAll("button")) {
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String(b.dataset.v === v));
+  }
+  chart.resetView(defaultBarW());
+  schedule();
+}
+elView.addEventListener("click", (e) => {
+  const b = (e.target as HTMLElement).closest("button");
+  if (b?.dataset.v) setView(b.dataset.v as ViewMode);
+});
+elDays.value = String(ui.days);
+elDays.addEventListener("change", () => {
+  ui.days = Number(elDays.value);
+  saveUi();
+  if (market) void selectMarket(market.market_id);
+});
+elRprof.value = ui.rightProfile;
+elRprof.addEventListener("change", () => {
+  ui.rightProfile = elRprof.value as "session" | "composite";
+  saveUi();
+  schedule();
+});
 elTf.addEventListener("click", (e) => {
   const b = (e.target as HTMLElement).closest("button");
   if (b?.dataset.v) setTf(Number(b.dataset.v));
@@ -269,7 +330,7 @@ elTf.addEventListener("click", (e) => {
 elMarket.addEventListener("change", () => void selectMarket(elMarket.value));
 elRow.addEventListener("change", () => {
   if (!market) return;
-  ui.rowByMarket[market.market_id] = Number(elRow.value);
+  ui.rowByMarket[rowKey(market)] = Number(elRow.value);
   saveUi();
   schedule();
 });
@@ -383,6 +444,46 @@ function renderPanel() {
     </dl>`);
   }
 
+  // --- TPO structure of the current session
+  if (ui.view === "tpo") {
+    const t = model.tpo[n - 1];
+    parts.push(`<h2>TPO (30m periods)</h2>`);
+    if (t?.va) {
+      const ibRange = t.ib ? (t.ib.hiRow + 1 - t.ib.loRow) * row : null;
+      parts.push(`<dl class="kv">
+        <dt class="poc-c">TPO POC</dt><dd class="poc-c">${rowLo(t.va.poc)}</dd>
+        <dt class="va-c">TPO VAH / VAL</dt><dd class="va-c">${rowHi(t.va.vah)} / ${rowLo(t.va.val)}</dd>
+        ${t.ib ? `<dt>Initial balance</dt><dd>${rowHi(t.ib.hiRow)} / ${rowLo(t.ib.loRow)}</dd><dt>IB range</dt><dd>${px(ibRange!)}</dd>` : ""}
+        <dt>Range extension</dt><dd>${t.rangeExtUp && t.rangeExtDown ? "both sides" : t.rangeExtUp ? "up" : t.rangeExtDown ? "down" : "none yet"}</dd>
+        <dt>Periods</dt><dd>${t.periods}</dd>
+        <dt>Excess</dt><dd>top ${t.topTail >= 2 ? `${t.topTail}-row tail` : t.poorHigh ? '<span class="ctx-c">poor high</span>' : "—"} · bottom ${t.bottomTail >= 2 ? `${t.bottomTail}-row tail` : t.poorLow ? '<span class="ctx-c">poor low</span>' : "—"}</dd>
+      </dl>
+      <p class="note" style="margin-top:6px">TPO is time at price, rebuilt from 1-minute candle highs and lows, so it's exact for every past session.</p>`);
+    } else parts.push(`<p class="none">Waiting for data…</p>`);
+  }
+
+  // --- previous sessions
+  if (n >= 2) {
+    const rowsHtml: string[] = [];
+    for (let k = n - 1; k >= 0; k--) {
+      const ss = model.sessions[k];
+      const va = ui.view === "tpo" ? model.tpo[k]?.va ?? null : ss.va;
+      const pv = k > 0 ? (ui.view === "tpo" ? model.tpo[k - 1]?.va ?? null : model.sessions[k - 1].va) : null;
+      if (!va) continue;
+      const rel = pv ? valueRelation(va, pv).replace("overlapping-", "ovl ") : "—";
+      rowsHtml.push(`<tr><td>${esc(fmtDate(ss.start, tz))}${k === n - 1 ? " •" : ""}</td><td class="poc-c">${rowLo(va.poc)}</td><td class="va-c">${rowHi(va.vah)}<br>${rowLo(va.val)}</td><td>${esc(rel)}</td></tr>`);
+    }
+    parts.push(`<h2>Sessions${ui.view === "tpo" ? " (TPO value)" : ""}</h2><table class="sess"><thead><tr><th>Day</th><th>POC</th><th>VAH / VAL</th><th>Value</th></tr></thead><tbody>${rowsHtml.join("")}</tbody></table>`);
+  }
+  if (ui.rightProfile === "composite" && model.composite?.va) {
+    const c = model.composite;
+    parts.push(`<h2>Composite ${c.days}d</h2><dl class="kv">
+      <dt class="poc-c">cPOC</dt><dd class="poc-c">${rowLo(c.va!.poc)}</dd>
+      <dt class="va-c">cVAH / cVAL</dt><dd class="va-c">${rowHi(c.va!.vah)} / ${rowLo(c.va!.val)}</dd>
+      <dt>From live trades</dt><dd>${(c.realShare * 100).toFixed(1)}%</dd>
+    </dl>`);
+  }
+
   // --- context (never signals)
   parts.push(`<h2>Auction context</h2>`);
   const items: string[] = [];
@@ -421,7 +522,8 @@ function renderPanel() {
     <dt>Real delta since</dt><dd>${real ? fmtTime(real, tz) : "—"}</dd>
     <dt>Trades recorded</dt><dd>${f.book ? f.book.accepted.toLocaleString() : 0}</dd>
     <dt>Restored from browser</dt><dd>${f.restoredMinutes} min</dd>
-    <dt>1m candles</dt><dd>${f.history.candles.toLocaleString()} <span class="tag">${f.history.state}</span></dd>
+    <dt>Candles</dt><dd>${f.history.candles.toLocaleString()} <span class="tag">${f.history.state}</span></dd>
+    ${f.history.coarseBefore ? `<dt>30m history before</dt><dd>${fmtDateTime(f.history.coarseBefore, tz)}</dd>` : ""}
     ${st.markPx != null ? `<dt>Mark</dt><dd>${st.markPx.toFixed(Math.min(8, dp))}</dd>` : ""}
     ${st.openInterestUsd != null ? `<dt>Open interest</dt><dd>${fmtUsd(st.openInterestUsd)}</dd>` : ""}
     ${st.fundingRate != null ? `<dt>Funding</dt><dd>${(st.fundingRate * 100).toFixed(4)}%${st.fundingIntervalHours ? ` / ${st.fundingIntervalHours}h` : ""}</dd>` : ""}
@@ -446,6 +548,10 @@ function renderPanel() {
 async function boot() {
   for (const b of elTf.querySelectorAll("button")) b.setAttribute("role", "radio");
   for (const b of elTf.querySelectorAll("button")) b.setAttribute("aria-checked", String(Number((b as HTMLElement).dataset.v) === ui.tf));
+  for (const b of elView.querySelectorAll("button")) {
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String((b as HTMLElement).dataset.v === ui.view));
+  }
   elRow.innerHTML = "<option>—</option>";
   elRow.disabled = true;
   renderPanel();

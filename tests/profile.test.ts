@@ -75,3 +75,19 @@ describe("developing POC", () => {
     expect(d.poc()).toBe(12);
   });
 });
+
+describe("mergeProfiles", () => {
+  it("adds row volumes across sessions and keeps real/estimated split", async () => {
+    const { mergeProfiles, profileFromRows, valueArea } = await import("../src/analytics/profile");
+    const a = profileFromRows(new Map([[10, { b: 2, s: 1, e: 0 }], [11, { b: 0, s: 0, e: 4 }]]));
+    const b = profileFromRows(new Map([[11, { b: 1, s: 1, e: 0 }], [13, { b: 0, s: 0, e: 3 }]]));
+    const c = mergeProfiles([a, b]);
+    expect([c.lo, c.hi]).toEqual([10, 13]);
+    expect(Array.from(c.vol)).toEqual([3, 6, 0, 3]);
+    expect(Array.from(c.buy)).toEqual([2, 1, 0, 0]);
+    expect(Array.from(c.est)).toEqual([0, 4, 0, 3]);
+    expect(c.total).toBe(12);
+    // POC 11 (6); target 8.4: up pair 12+13 = 3, down 10 = 3 -> equal -> both -> 12 => VA 10..13
+    expect(valueArea(c)).toMatchObject({ poc: 11, val: 10, vah: 13 });
+  });
+});

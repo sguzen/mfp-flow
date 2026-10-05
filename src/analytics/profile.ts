@@ -188,3 +188,20 @@ export class DevelopingProfile {
     return best;
   }
 }
+
+/** Merge several profiles (same row size) into one composite profile. */
+export function mergeProfiles(profiles: Profile[]): Profile {
+  const rows = new Map<number, RowAccum>();
+  for (const p of profiles) {
+    for (let i = 0; i < p.hi - p.lo + 1; i++) {
+      if (p.vol[i] <= 0) continue;
+      const r = p.lo + i;
+      const a = rows.get(r) ?? { b: 0, s: 0, e: 0 };
+      a.b += p.buy[i];
+      a.s += p.sell[i];
+      a.e += p.est[i];
+      rows.set(r, a);
+    }
+  }
+  return profileFromRows(rows);
+}

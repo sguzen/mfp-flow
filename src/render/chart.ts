@@ -16,6 +16,7 @@
 import { decimalsFor, formatUnits, niceCeil, PRICE_SCALE } from "../analytics/price";
 import { barDelta, type SessionStats } from "../analytics/series";
 import { barSource } from "../analytics/types";
+import { tpoLetter } from "../analytics/tpo";
 import type { ChartModel } from "../model";
 import { fmtDate, fmtDateTime, fmtSigned, fmtTime, fmtVol, type TimeZoneMode } from "./format";
 import { alpha, hatchPattern, readPalette, type Palette } from "./theme";
@@ -306,15 +307,22 @@ export class FootprintChart {
     ctx.beginPath();
     ctx.rect(L.plotX0, L.mainY0, L.plotX1 - L.plotX0, L.mainY1 - L.mainY0);
     ctx.clip();
+    const view = m.settings.view;
     this.drawGrid(i0, i1);
+    if (view === "profiles") this.drawSessionHistograms(i0, i1);
     this.drawSessionBands(i0, i1);
+    this.drawCompositeLevels();
     this.drawReferenceLevels();
-    let maxCell = 0;
-    for (let i = i0; i <= i1; i++) maxCell = Math.max(maxCell, m.barInfo(m.bars[i]).maxCell);
-    for (let i = i0; i <= i1; i++) this.drawBar(i, rowH, maxCell);
-    this.drawDevelopingPoc(i0, i1);
-    if (this.meta.showMarkers) this.drawContextMarkers();
-    if (this.meta.showDivergence) this.drawDivergencesPrice(i0, i1);
+    if (view === "tpo") {
+      this.drawTpo(i0, i1, rowH);
+    } else {
+      let maxCell = 0;
+      for (let i = i0; i <= i1; i++) maxCell = Math.max(maxCell, m.barInfo(m.bars[i]).maxCell);
+      for (let i = i0; i <= i1; i++) this.drawBar(i, rowH, maxCell);
+      if (view === "footprint") this.drawDevelopingPoc(i0, i1);
+    }
+    if (this.meta.showMarkers && view === "footprint") this.drawContextMarkers();
+    if (this.meta.showDivergence && view !== "tpo") this.drawDivergencesPrice(i0, i1);
     this.drawLastPrice();
     ctx.restore();
 
@@ -408,11 +416,12 @@ export class FootprintChart {
     const last = m.sessions.length - 1;
     for (let k = 0; k < m.sessions.length; k++) {
       const s = m.sessions[k];
-      if (s.i1 < i0 || s.i0 > i1 || !s.va) continue;
+      const va = m.settings.view === "tpo" ? m.tpo[k]?.va : s.va;
+      if (s.i1 < i0 || s.i0 > i1 || !va) continue;
       const x0 = this.xLeft(s.i0);
       const x1 = k === last ? this.L.plotX1 : this.xLeft(s.i1) + this.barW;
-      const yH = this.yOf((s.va.vah + 1) * row);
-      const yL = this.yOf(s.va.val * row);
+      const yH = this.yOf((va.vah + 1) * row);
+      const yL = this.yOf(va.val * row);
       ctx.fillStyle = P.vaFill;
       ctx.fillRect(x0, yH, x1 - x0, yL - yH);
       ctx.lineWidth = 1;
@@ -424,7 +433,8 @@ export class FootprintChart {
       ctx.moveTo(x0, Math.round(yL) + 0.5);
       ctx.lineTo(x1, Math.round(yL) + 0.5);
       ctx.stroke();
-      const yP = Math.round(this.yOf((s.va.poc + 0.5) * row)) + 0.5;
+      if (m.settings.view === "tpo") continue; // the TPO POC row is highlighted instead
+      const yP = Math.round(this.yOf((va.poc + 0.5) * row)) + 0.5;
       ctx.strokeStyle = alpha(P.poc, 0.8);
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
@@ -461,13 +471,15 @@ export class FootprintChart {
       ctx.fillStyle = color;
       ctx.fillText(label, L.plotX1 - 4, y - 2);
     };
+    const priorNaked = !!prior && m.ctx.naked.some((nk) => nk.session === prior.start);
     if (prior?.va && cur) {
       const x0 = this.xLeft(cur.i0);
       line((prior.va.vah + 1) * row, x0, P.prior, [3, 3], "pVAH");
       line(prior.va.val * row, x0, P.prior, [3, 3], "pVAL");
-      line((prior.va.poc + 0.5) * row, x0, P.prior, [8, 3], "pPOC");
+      line((prior.va.poc + 0.5) * row, x0, P.prior, [8, 3], priorNaked ? "pPOC · naked" : "pPOC");
     }
     for (const nk of m.ctx.naked) {
+      if (prior && nk.session === prior.start) continue; // already drawn as pPOC
       const sidx = m.sessions.findIndex((s) => s.start === nk.session);
       if (sidx < 0) continue;
       const s = m.sessions[sidx];
@@ -489,8 +501,8 @@ export class FootprintChart {
     const src = barSource(b);
     const info = m.barInfo(b);
 
-    if (bw < 7) {
-      // pure candle mode
+    if (bw < 7 || m.settings.view !== "footprint") {
+      // pure candle mode (also used by the Profiles view)
       const cx = Math.round(x + bw / 2) + 0.5;
       const color = src === "est" ? (up ? alpha(P.buy, 0.55) : alpha(P.sell, 0.55)) : up ? P.buy : P.sell;
       ctx.strokeStyle = color;
@@ -664,6 +676,195 @@ export class FootprintChart {
       ctx.lineTo(mx, yl);
       ctx.stroke();
     }
+  }
+
+  /** x-span of a session in the plot (the current session extends to the plot edge). */
+  private sessionSpan(k: number): [number, number] {
+    const m = this.model!;
+    const s = m.sessions[k];
+    const x0 = this.xLeft(s.i0);
+    const x1 = k === m.sessions.length - 1 ? Math.max(this.xLeft(s.i1) + this.barW, this.L.plotX1 - RIGHT_PAD) : this.xLeft(s.i1) + this.barW;
+    return [x0, x1];
+  }
+
+  /** Profiles view: each session's volume profile drawn inside its own time span. */
+  private drawSessionHistograms(i0: number, i1: number) {
+    const m = this.model!;
+    const ctx = this.ctx;
+    const P = this.pal;
+    const row = m.settings.rowUnits;
+    const rowH = row / this.upp;
+    const gap = rowH >= 4 ? 1 : 0;
+    const h = Math.max(1, rowH - gap);
+    const rTop = Math.ceil(this.uOf(this.L.mainY0) / row) + 1;
+    const rBot = Math.floor(this.uOf(this.L.mainY1) / row) - 1;
+    for (let k = 0; k < m.sessions.length; k++) {
+      const s = m.sessions[k];
+      if (s.i1 < i0 || s.i0 > i1) continue;
+      const p = s.profile;
+      const [x0, x1] = this.sessionSpan(k);
+      const maxW = (x1 - x0) * 0.82;
+      if (maxW < 6) continue;
+      let maxV = 0;
+      for (let i = 0; i < p.vol.length; i++) if (p.vol[i] > maxV) maxV = p.vol[i];
+      if (maxV <= 0) continue;
+      const va = s.va;
+      for (let r = Math.max(p.lo, rBot); r <= Math.min(p.hi, rTop); r++) {
+        const i = r - p.lo;
+        const v = p.vol[i];
+        if (v <= 0) continue;
+        const y = this.yOf((r + 1) * row);
+        const inVa = !!va && r >= va.val && r <= va.vah;
+        const isPoc = !!va && r === va.poc;
+        const base = isPoc ? P.poc : inVa ? P.profileVa : P.profile;
+        const wReal = (maxW * (p.buy[i] + p.sell[i])) / maxV;
+        const wEst = (maxW * p.est[i]) / maxV;
+        if (wReal > 0) {
+          ctx.fillStyle = alpha(base, isPoc ? 0.75 : 0.55);
+          ctx.fillRect(x0 + 1, y, wReal, h);
+        }
+        if (wEst > 0) {
+          ctx.fillStyle = alpha(base, isPoc ? 0.6 : 0.36);
+          ctx.fillRect(x0 + 1 + wReal, y, wEst, h);
+          if (this.hatchProfile && h >= 3 && !isPoc) {
+            ctx.fillStyle = this.hatchProfile;
+            ctx.globalAlpha = 0.35;
+            ctx.fillRect(x0 + 1 + wReal, y, wEst, h);
+            ctx.globalAlpha = 1;
+          }
+        }
+      }
+      // per-session level labels at the right end of the session
+      if (va && x1 - x0 > 70) {
+        ctx.font = `10px ${MONO}`;
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        const dp = this.priceDp(row);
+        const lab = (u: number, color: string, txt: string) => {
+          const y = this.yOf(u);
+          if (y < this.L.mainY0 + 6 || y > this.L.mainY1 - 6) return;
+          ctx.fillStyle = color;
+          ctx.fillText(`${txt} ${formatUnits(u, dp)}`, x1 - 4, y - 6);
+        };
+        if (k !== m.sessions.length - 1) {
+          lab((va.vah + 1) * row, P.va, "VAH");
+          lab((va.poc + 0.5) * row, P.poc, "POC");
+          lab(va.val * row, P.va, "VAL");
+        }
+      }
+    }
+  }
+
+  /** TPO view: stacked period letters per session (blocks when zoomed out). */
+  private drawTpo(i0: number, i1: number, rowH: number) {
+    const m = this.model!;
+    const ctx = this.ctx;
+    const P = this.pal;
+    const row = m.settings.rowUnits;
+    const dark = document.documentElement.dataset.theme !== "light";
+    const color = (k: number, n: number) => {
+      const hue = 205 - (Math.min(k, 47) / Math.max(1, Math.min(n, 48) - 1)) * 205;
+      return `hsl(${hue.toFixed(0)} ${dark ? "62% 62%" : "70% 38%"})`;
+    };
+    const rTop = Math.ceil(this.uOf(this.L.mainY0) / row) + 1;
+    const rBot = Math.floor(this.uOf(this.L.mainY1) / row) - 1;
+    for (let k = 0; k < m.sessions.length; k++) {
+      const s = m.sessions[k];
+      const t = m.tpo[k];
+      if (!t || s.i1 < i0 || s.i0 > i1) continue;
+      const [sx0, sx1] = this.sessionSpan(k);
+      const x0 = sx0 + 8;
+      let maxC = 0;
+      for (const c of t.counts) if (c > maxC) maxC = c;
+      const cellW = Math.max(1, Math.min(rowH >= 9 ? Math.max(8, rowH * 0.85) : 6, (sx1 - x0 - 4) / Math.max(1, maxC)));
+      const h = Math.max(1, rowH - (rowH >= 4 ? 1 : 0));
+      const letters = cellW >= 7 && rowH >= 9;
+      const fontPx = Math.max(8, Math.min(13, Math.floor(Math.min(rowH, cellW * 1.25) - 1)));
+      if (letters) {
+        ctx.font = `600 ${fontPx}px ${MONO}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+      }
+      const n = t.periods;
+      for (let r = Math.max(t.lo, rBot); r <= Math.min(t.hi, rTop); r++) {
+        const ps = t.rows[r - t.lo];
+        if (!ps.length) continue;
+        const y = this.yOf((r + 1) * row);
+        if (t.poc === r) {
+          ctx.fillStyle = alpha(P.poc, 0.22);
+          ctx.fillRect(x0 - 1, y, ps.length * cellW + 2, h);
+        }
+        for (let j = 0; j < ps.length; j++) {
+          const cx = x0 + j * cellW;
+          if (letters) {
+            ctx.fillStyle = color(ps[j], n);
+            ctx.fillText(tpoLetter(ps[j]), cx + cellW / 2, y + h / 2 + 0.5);
+          } else {
+            ctx.fillStyle = color(ps[j], n);
+            ctx.fillRect(cx, y, Math.max(1, cellW - (cellW >= 3 ? 1 : 0)), h);
+          }
+        }
+      }
+      // initial balance bracket
+      if (t.ib) {
+        const yA = this.yOf((t.ib.hiRow + 1) * row);
+        const yB = this.yOf(t.ib.loRow * row);
+        ctx.fillStyle = alpha(P.va, 0.9);
+        ctx.fillRect(sx0 + 3, yA, 2, yB - yA);
+      }
+      // single prints marker
+      for (const sp of t.singlePrints) {
+        if (sp.to - sp.from < 1) continue; // runs of 2+ rows only
+        const yA = this.yOf((sp.to + 1) * row);
+        const yB = this.yOf(sp.from * row);
+        ctx.fillStyle = alpha(P.ctxMark, 0.85);
+        ctx.fillRect(x0 - 4, yA, 2, yB - yA);
+      }
+      // poor extremes
+      ctx.font = `600 9px ${SANS}`;
+      ctx.textAlign = "left";
+      ctx.fillStyle = P.ctxMark;
+      if (t.poorHigh && k !== m.sessions.length - 1) {
+        ctx.textBaseline = "bottom";
+        ctx.fillText("poor high", x0, this.yOf((t.hi + 1) * row) - 2);
+      }
+      if (t.poorLow && k !== m.sessions.length - 1) {
+        ctx.textBaseline = "top";
+        ctx.fillText("poor low", x0, this.yOf(t.lo * row) + 2);
+      }
+    }
+  }
+
+  /** Composite VAH / VAL / POC across the whole plot when the composite profile is shown. */
+  private drawCompositeLevels() {
+    const m = this.model!;
+    const c = m.composite;
+    if (m.settings.rightProfile !== "composite" || !c?.va) return;
+    const ctx = this.ctx;
+    const P = this.pal;
+    const L = this.L;
+    const row = m.settings.rowUnits;
+    ctx.font = `10px ${MONO}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    const line = (u: number, color: string, dash: number[], label: string) => {
+      const y = Math.round(this.yOf(u)) + 0.5;
+      if (y < L.mainY0 || y > L.mainY1) return;
+      ctx.strokeStyle = alpha(color, 0.75);
+      ctx.setLineDash(dash);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(L.plotX0, y);
+      ctx.lineTo(L.plotX1, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineWidth = 1;
+      ctx.fillStyle = color;
+      ctx.fillText(label, L.plotX0 + 4, y - 2);
+    };
+    line((c.va.vah + 1) * row, P.va, [10, 4], `cVAH ${c.days}d`);
+    line(c.va.val * row, P.va, [10, 4], `cVAL ${c.days}d`);
+    line((c.va.poc + 0.5) * row, P.poc, [10, 4], `cPOC ${c.days}d`);
   }
 
   private drawDevelopingPoc(i0: number, i1: number) {
@@ -896,8 +1097,8 @@ export class FootprintChart {
       ctx.fillStyle = P.dim;
       ctx.font = `600 10px ${SANS}`;
       ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText(`Session ${fmtDateTime(s.start, this.meta.tz)}`, x + 4, L.mainY0 + 3);
+      ctx.textBaseline = "bottom";
+      ctx.fillText(`Session ${fmtDateTime(s.start, this.meta.tz)}`, x + 4, L.mainY1 - 3);
     }
   }
 
@@ -1080,10 +1281,14 @@ export class FootprintChart {
     const ctx = this.ctx;
     const P = this.pal;
     const L = this.L;
-    const s = this.profileSession();
+    const sess = this.profileSession();
     ctx.fillStyle = P.panel;
     ctx.fillRect(L.profX0, 0, L.profX1 - L.profX0, L.timeY0);
-    if (!s) return;
+    if (!sess) return;
+    const comp = m.settings.rightProfile === "composite" ? m.composite : null;
+    const s = comp
+      ? { profile: comp.profile, va: comp.va, realShare: comp.realShare, volume: comp.profile.total, start: comp.start }
+      : sess;
     const row = m.settings.rowUnits;
     const p = s.profile;
     const pw = L.profX1 - L.profX0 - 10;
@@ -1124,7 +1329,7 @@ export class FootprintChart {
       }
     }
     // LVN / single-print brackets
-    if (this.meta.showMarkers && s === m.sessions[m.sessions.length - 1]) {
+    if (this.meta.showMarkers && !comp && sess === m.sessions[m.sessions.length - 1]) {
       const marks: Array<[number, number, string]> = [
         ...m.ctx.lvn.map((r) => [r.from, r.to, "LVN"] as [number, number, string]),
         ...m.ctx.singlePrints.map((r) => [r.from, r.to, "SP"] as [number, number, string]),
@@ -1170,7 +1375,7 @@ export class FootprintChart {
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     const realPct = s.realShare * 100;
-    ctx.fillText(`Profile ${fmtDate(s.start, this.meta.tz)}`, L.profX0 + 4, 8);
+    ctx.fillText(comp ? `Composite ${comp.days}d from ${fmtDate(comp.start, this.meta.tz)}` : `Profile ${fmtDate(s.start, this.meta.tz)}`, L.profX0 + 4, 8);
     // footer in delta strip area: data quality
     ctx.font = `9px ${SANS}`;
     ctx.fillStyle = P.dim;

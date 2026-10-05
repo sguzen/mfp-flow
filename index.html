@@ -19,6 +19,10 @@
         <select id="market"></select>
       </div>
 
+      <div class="seg" id="view" role="radiogroup" aria-label="Chart view">
+        <button data-v="footprint">Footprint</button><button data-v="profiles">Profiles</button><button data-v="tpo">TPO</button>
+      </div>
+
       <div class="seg" id="tf" role="radiogroup" aria-label="Bar interval">
         <button data-v="1">1m</button><button data-v="5">5m</button><button data-v="15">15m</button><button data-v="30">30m</button>
       </div>
@@ -34,6 +38,16 @@
           <option value="utc">UTC day</option>
           <option value="ny18">18:00 ET</option>
         </select>
+      </div>
+
+      <div class="ctrl">
+        <label for="days">Days</label>
+        <select id="days"><option value="3">3</option><option value="5">5</option><option value="10">10</option></select>
+      </div>
+
+      <div class="ctrl">
+        <label for="rprof">Right</label>
+        <select id="rprof"><option value="session">Session</option><option value="composite">Composite</option></select>
       </div>
 
       <details class="menu" id="opts">

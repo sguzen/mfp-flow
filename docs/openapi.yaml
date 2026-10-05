@@ -1,0 +1,2341 @@
+openapi: 3.1.0
+info:
+  title: MyFundedPerps API (Beta)
+  version: 1.0.0
+  description: >-
+    The developer API is in beta. Breaking changes may be introduced at any time.
+    Programmatic access to MyFundedPerps paper-trading challenge accounts.
+    API trades use the same real order books and simulated execution engine as
+    the web trading interface. Every response carries an `X-Request-Id` header
+    for support and log correlation.
+  contact:
+    url: https://myfundedperpetuals.com/contact
+servers:
+  - url: https://developers.myfundedperpetuals.com
+    description: Live
+  - url: https://sandbox.myfundedperpetuals.com
+    description: Sandbox (test keys and sandbox accounts only)
+security:
+  - bearerAuth: []
+tags:
+  - name: General
+  - name: Authentication
+  - name: Accounts
+  - name: Markets
+  - name: Positions
+  - name: Orders
+  - name: Fills
+  - name: Strategy Orders
+paths:
+  /v1/copy-trading:
+    get:
+      operationId: listCopyTradingConfigurations
+      summary: List visible copy trading groups
+      tags: [Accounts]
+      description: Returns only groups whose lead and every follower are accessible to this credential in this environment, including stopped groups. Omitted groups are never modified by saving visible groups.
+      responses:
+        "200":
+          description: Visible copy groups.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      { $ref: "#/components/schemas/CopyTradingConfiguration" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      operationId: saveCopyTradingConfigurations
+      summary: Save copy trading groups
+      tags: [Accounts]
+      description: Explicitly upserts submitted groups and deletes only deleted_config_ids. Requires trade scope and access to all existing and submitted members. Omitted groups remain unchanged. Disable a group before deleting it or changing its lead. New groups omit config_id; a retry without an existing config_id can create another disabled group, so read back state after an ambiguous response before retrying.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [groups, deleted_config_ids]
+              properties:
+                groups:
+                  type: array
+                  maxItems: 20
+                  items: { $ref: "#/components/schemas/CopyTradingGroupInput" }
+                deleted_config_ids:
+                  type: array
+                  maxItems: 20
+                  items: { type: string }
+      responses:
+        "200":
+          description: All submitted changes committed atomically.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CopyTradingWriteResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: The configuration violates account eligibility, group membership, or cleanup rules.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+  /v1/copy-trading/{config_id}/disable:
+    post:
+      operationId: disableCopyTradingConfiguration
+      summary: Disable a copy trading group
+      tags: [Accounts]
+      description: Requires trade scope and access to every group member. Stops new copying and schedules cleanup of outstanding copied orders. Existing filled positions remain open. Works when members are inactive or archived.
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Copying disabled and cleanup scheduled.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CopyTradingWriteResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: The configuration violates account eligibility, group membership, or cleanup rules.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+  /v1/accounts/{account_id}/acknowledge-copy-stop:
+    post:
+      operationId: acknowledgeCopyTradingStop
+      summary: Acknowledge a completed copy stop
+      tags: [Accounts]
+      description: Requires trade scope. Read copy_stop.stopped_at from the account trading-policy endpoint first; this survives deletion of the original group. Acknowledges only the exact completed stop timestamp. An outdated timestamp or cleanup still in progress makes this a no-op.
+      parameters:
+        - name: account_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [stopped_at]
+              properties:
+                stopped_at:
+                  {
+                    type: number,
+                    description: Exact stop timestamp in Unix milliseconds.,
+                  }
+      responses:
+        "200":
+          description: Acknowledgement processed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CopyTradingWriteResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: The configuration violates account eligibility, group membership, or cleanup rules.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+  /v1:
+    get:
+      operationId: getApiInformation
+      summary: Get API information
+      tags: [General]
+      security: []
+      responses:
+        "200":
+          description: API name, version, environment, and documentation URL.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [name, version, environment, documentation]
+                    properties:
+                      name: { type: string, example: MyFundedPerps API }
+                      version: { type: string, example: v1 }
+                      environment:
+                        type: string
+                        enum: [live, test]
+                        description: >-
+                          `live` on developers.myfundedperpetuals.com, `test`
+                          on sandbox.myfundedperpetuals.com.
+                        example: live
+                      documentation:
+                        type: string
+                        format: uri
+                        example: https://docs.myfundedperpetuals.com
+  /v1/restricted-countries:
+    get:
+      operationId: listRestrictedCountries
+      summary: List restricted countries
+      description: >-
+        Returns the ISO 3166-1 alpha-2 codes of every country whose residents
+        cannot register or purchase challenges, sorted alphabetically. No API
+        key is required. Responses are cached at the edge for five minutes,
+        so a restriction added or removed by the compliance team can take up
+        to that long to appear.
+      tags: [General]
+      security: []
+      responses:
+        "200":
+          description: Restricted countries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/RestrictedCountry" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/auth/cli/token:
+    post:
+      operationId: exchangeCliAuthorizationCode
+      summary: Exchange a CLI authorization code
+      description: >-
+        Redeems a one-time authorization code approved in the browser during
+        `fperp login`, together with its PKCE code verifier, for a new
+        expiring CLI session credential. The credential is returned exactly
+        once and authenticates like an API key with trade access to every
+        owned account. Available on the live host only. The `fperp` CLI calls
+        this endpoint itself; it is documented for transparency rather than
+        direct use.
+      tags: [Authentication]
+      security: []
+      x-fp-cli: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, code_verifier]
+              properties:
+                code:
+                  type: string
+                  description: One-time authorization code from the approval page.
+                code_verifier:
+                  type: string
+                  description: PKCE code verifier that produced the approved S256 challenge.
+      responses:
+        "200":
+          description: The new CLI session credential.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [api_key, token_type, expires_at, name]
+                    properties:
+                      api_key:
+                        type: string
+                        description: Bearer credential, returned exactly once.
+                      token_type: { type: string, example: Bearer }
+                      expires_at:
+                        type: integer
+                        description: Session expiry as a Unix timestamp in milliseconds.
+                      name:
+                        type: string
+                        description: Stored session label derived from the device name.
+        "400":
+          description: Invalid request fields, or an invalid, expired, or already used code.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/auth/cli/revoke:
+    post:
+      operationId: revokeCliSession
+      summary: Revoke the presented CLI session
+      description: >-
+        Deletes the CLI session presented as the bearer credential
+        (`fperp logout`). Only OAuth-minted CLI sessions can be revoked here;
+        API keys are managed from account settings. Available on the live
+        host only.
+      tags: [Authentication]
+      x-fp-cli: false
+      responses:
+        "200":
+          description: Whether a CLI session was revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [revoked]
+                    properties:
+                      revoked: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/accounts:
+    get:
+      operationId: listAccounts
+      summary: List challenge accounts
+      description: Returns the authenticated user's non-archived challenge accounts.
+      tags: [Accounts]
+      responses:
+        "200":
+          description: Challenge accounts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Account" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/accounts/{account_id}:
+    get:
+      operationId: getAccount
+      summary: Get a challenge account
+      description: Returns account identity, realized balance, and a fresh risk snapshot marked from authoritative book mids.
+      tags: [Accounts]
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+      responses:
+        "200":
+          description: Challenge account detail.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Account" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/accounts/{account_id}/trading-policy:
+    get:
+      operationId: getAccountTradingPolicy
+      summary: Get effective account trading policy
+      description: Returns an advisory snapshot of effective account rules, configured trading limits, user restrictions, payout and copy locks, and trading halts. Read scope is sufficient. Placement and settlement recheck authority; this snapshot does not reserve capacity or guarantee an order will pass.
+      tags: [Accounts]
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+      responses:
+        "200":
+          description: Effective account trading policy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/AccountTradingPolicy" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/accounts/{account_id}/cancel-all-orders:
+    post:
+      operationId: cancelAllAccountOrders
+      summary: Cancel all working orders
+      description: >-
+        Takes one bounded snapshot of the account's ordinary resting orders and
+        armed trigger orders, then cancels or queues cancellation for every
+        target. In-flight market orders and TWAP, VWAP, or scaled parent orders
+        are not included. Repeating the request with the same idempotency key
+        resumes or replays the original snapshot.
+      tags: [Accounts, Orders]
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Completed operation replay.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CancelAllOrdersEnvelope" }
+        "201":
+          description: Operation completed for the first time.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CancelAllOrdersEnvelope" }
+        "202":
+          description: A bounded slice completed. Retry with the same idempotency key after Retry-After.
+          headers:
+            Retry-After: { $ref: "#/components/headers/RetryAfter" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CancelAllOrdersEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: A complete bounded working-order snapshot is temporarily unavailable.
+          headers:
+            Retry-After: { $ref: "#/components/headers/RetryAfter" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+  /v1/accounts/{account_id}/close-all-positions:
+    post:
+      operationId: closeAllAccountPositions
+      summary: Close all open positions
+      description: >-
+        Takes one bounded snapshot of every open position and submits one
+        reduce-only market close for each target. Closes use the same 2.5%
+        maximum-slippage policy as Close All in the trading terminal. The
+        response reports each submitted or rejected child order. Repeating the
+        request with the same idempotency key resumes or replays the original
+        snapshot, even when positions have since closed.
+      tags: [Accounts, Positions]
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Completed operation replay.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CloseAllPositionsEnvelope" }
+        "201":
+          description: Operation completed for the first time.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CloseAllPositionsEnvelope" }
+        "202":
+          description: One close target or cooldown attempt completed. Retry with the same idempotency key after Retry-After.
+          headers:
+            Retry-After: { $ref: "#/components/headers/RetryAfter" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CloseAllPositionsEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: A complete bounded open-position snapshot is temporarily unavailable.
+          headers:
+            Retry-After: { $ref: "#/components/headers/RetryAfter" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+  /v1/markets:
+    get:
+      operationId: listMarkets
+      summary: List tradable markets
+      description: Returns the selected execution venue for each currently tradable instrument.
+      tags: [Markets]
+      security: []
+      responses:
+        "200":
+          description: Tradable markets.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Market" }
+  /v1/markets/{market_id}:
+    get:
+      operationId: getMarket
+      summary: Get a tradable market
+      tags: [Markets]
+      parameters:
+        - $ref: "#/components/parameters/MarketId"
+      responses:
+        "200":
+          description: Market detail and execution capabilities.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Market" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/markets/{market_id}/quote:
+    get:
+      operationId: getMarketQuote
+      summary: Get an execution quote
+      description: >-
+        Returns the best bid, best ask, and midpoint from a fresh authoritative
+        execution book. Provide both side and size to walk the complete visible
+        execution depth and estimate the fill, notional, and taker fee. The
+        quote escalates to a newer deep book when the ordinary book is too
+        shallow and the venue supports deeper execution data. URL-encode the
+        pipe in a market ID when it is used in the path.
+      tags: [Markets]
+      parameters:
+        - $ref: "#/components/parameters/MarketId"
+        - name: side
+          in: query
+          description: Order side. Must be provided together with size.
+          schema: { type: string, enum: [buy, sell] }
+        - name: size
+          in: query
+          description: Base-asset size to walk through the execution book. Must be provided together with side.
+          schema: { type: number, exclusiveMinimum: 0 }
+      responses:
+        "200":
+          description: Current execution quote.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Quote" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: A fresh quote is temporarily unavailable.
+          headers:
+            Retry-After: { $ref: "#/components/headers/RetryAfter" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+  /v1/positions:
+    get:
+      operationId: listOpenPositions
+      summary: List open positions
+      tags: [Positions]
+      parameters:
+        - $ref: "#/components/parameters/AccountIdQuery"
+        - name: status
+          in: query
+          description: Open positions by default, or cursor-paginated closed positions.
+          schema: { type: string, enum: [open, closed], default: open }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 1024 }
+      responses:
+        "200":
+          description: >-
+            Positions for the account. `status=closed` responses are
+            cursor-paginated and include `has_more` and `next_cursor`; the
+            default open-position view returns the complete bounded set.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Position" }
+                  has_more:
+                    type: boolean
+                    description: Present only when `status=closed`.
+                  next_cursor:
+                    type: string
+                    description: Present only when `status=closed` and more pages exist.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/positions/{position_id}:
+    get:
+      operationId: getPosition
+      summary: Get a position
+      tags: [Positions]
+      parameters:
+        - $ref: "#/components/parameters/PositionId"
+      responses:
+        "200":
+          description: Open or closed position detail.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Position" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/positions/{position_id}/close:
+    post:
+      operationId: closePosition
+      summary: Close part or all of a position
+      description: >-
+        Resolves the current position side, leverage, and margin mode on the
+        server and submits a reduce-only market, limit, or conditional order.
+        Omit size to close the complete current position.
+      tags: [Positions]
+      parameters:
+        - $ref: "#/components/parameters/PositionId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClosePositionRequest" }
+      responses:
+        "200":
+          description: Idempotent replay.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderEnvelope" }
+        "201":
+          description: Close order accepted.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/TradeRejected" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/positions/{position_id}/exit-orders:
+    put:
+      operationId: replacePositionExitOrders
+      summary: Atomically update position TP/SL orders
+      description: >-
+        Applies a stale-snapshot-guarded batch of place, modify, and cancel
+        operations. New opposite-group legs can be paired as OCO orders.
+      tags: [Positions]
+      parameters:
+        - $ref: "#/components/parameters/PositionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExitOrderBatchRequest" }
+      responses:
+        "200":
+          description: Exit orders updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Position" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/TradeRejected" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/positions/{position_id}/isolated-margin:
+    put:
+      operationId: setPositionIsolatedMargin
+      summary: Set the position's extra isolated margin
+      description: >-
+        Sets a desired total rather than applying a delta, making an identical
+        retry safe. Reductions use a fresh authoritative book and reject when
+        the new liquidation risk would be unsafe.
+      tags: [Positions]
+      parameters:
+        - $ref: "#/components/parameters/PositionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [extra_margin]
+              properties:
+                extra_margin: { type: number, minimum: 0 }
+      responses:
+        "200":
+          description: Isolated margin target applied.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Position" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/TradeRejected" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/orders:
+    get:
+      operationId: listOrders
+      summary: List recent orders
+      description: Returns newest orders first with a bounded opaque cursor.
+      tags: [Orders]
+      parameters:
+        - $ref: "#/components/parameters/OrderAccountIdQuery"
+        - name: client_order_id
+          in: query
+          description: >-
+            Return the order with this caller-assigned identity. This direct
+            lookup does not require account_id and cannot be combined with
+            status, limit, or cursor.
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - name: limit
+          in: query
+          description: Orders per page.
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: cursor
+          in: query
+          description: Opaque cursor returned as `next_cursor` by the previous page.
+          schema: { type: string, maxLength: 1024 }
+        - name: status
+          in: query
+          description: Set to `working` for the complete bounded pending and resting set.
+          schema: { type: string, enum: [working] }
+      responses:
+        "200":
+          description: A page of orders.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: A complete working-order snapshot is temporarily unavailable.
+          headers:
+            Retry-After: { $ref: "#/components/headers/RetryAfter" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    post:
+      operationId: createOrder
+      summary: Place a standard or advanced order
+      description: >-
+        Places market, limit, chase, stop, take, take-profit, or external
+        conditional orders through the authoritative paper-trading engine. The
+        optional client_order_id and the idempotency key are committed
+        transactionally with the order. Omit type for the original market-order
+        behavior.
+      tags: [Orders]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateOrderRequest" }
+            examples:
+              buyBitcoin:
+                summary: Buy BTC with cross margin
+                value:
+                  client_order_id: strategy-7:entry-42
+                  type: market
+                  account_id: j57abc123
+                  market_id: binance|BTCUSDT
+                  side: buy
+                  size: 0.001
+                  expected_price: 118000
+                  leverage: 2
+                  margin_mode: cross
+      responses:
+        "200":
+          description: Idempotent replay returning the order's current state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Order" }
+        "201":
+          description: Order accepted on the first completed request.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Order" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: The idempotency key was already used for a different order payload.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "413":
+          description: Request body exceeds 16 KiB.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "415":
+          description: Request body is not sent as application/json.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "422":
+          description: Order rejected by a trading rule.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TradeRejectionEnvelope" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/orders/{order_id}:
+    get:
+      operationId: getOrder
+      summary: Get an order
+      tags: [Orders]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order detail.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Order" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    patch:
+      operationId: modifyOrder
+      summary: Modify a working order
+      description: Reprices a modifiable order and optionally changes its size.
+      tags: [Orders]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [price]
+              properties:
+                price: { type: number, exclusiveMinimum: 0 }
+                size: { type: number, exclusiveMinimum: 0 }
+      responses:
+        "200":
+          description: Modification applied or queued behind an armed order.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/TradeRejected" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: cancelOrder
+      summary: Cancel a working order
+      description: Cancels a resting order or queues cancellation for an armed order.
+      tags: [Orders]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Cancellation accepted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [id, canceled]
+                    properties:
+                      id: { type: string }
+                      canceled: { type: boolean, const: true }
+                      queued: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: The order is terminal or managed by copy trading.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/orders/{order_id}/attached-exits:
+    put:
+      operationId: updateAttachedExits
+      summary: Update TP/SL attached to a resting limit entry
+      description: Set a leg with a positive price or remove it with null.
+      tags: [Orders]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                take_profit_price:
+                  oneOf:
+                    [{ type: number, exclusiveMinimum: 0 }, { type: "null" }]
+                stop_loss_price:
+                  oneOf:
+                    [{ type: number, exclusiveMinimum: 0 }, { type: "null" }]
+              minProperties: 1
+      responses:
+        "200":
+          description: Attached exits updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/TradeRejected" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/fills:
+    get:
+      operationId: listFills
+      summary: List fills in settlement order
+      tags: [Fills]
+      parameters:
+        - $ref: "#/components/parameters/AccountIdQuery"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 1024 }
+      responses:
+        "200":
+          description: Cursor-paginated filled orders, newest settlement first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/twap-orders:
+    get:
+      operationId: listActiveTwapOrders
+      summary: List active or historical TWAP and VWAP orders
+      tags: [Strategy Orders]
+      parameters:
+        - $ref: "#/components/parameters/AccountIdQuery"
+        - name: status
+          in: query
+          description: Active returns all running and canceling parents. Completed or canceled selects cursor-paginated history, newest creation first. Includes TWAP and VWAP.
+          schema:
+            {
+              type: string,
+              enum: [active, completed, canceled],
+              default: active,
+            }
+        - name: limit
+          in: query
+          description: History only.
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: cursor
+          in: query
+          description: History only.
+          schema: { type: string, maxLength: 1024 }
+      responses:
+        "200":
+          description: Scheduled orders. Limit and cursor require completed or canceled status; history defaults to 50 items.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/TwapOrder" }
+                  has_more:
+                    {
+                      type: boolean,
+                      description: Present for history requests.,
+                    }
+                  next_cursor:
+                    {
+                      type: string,
+                      description: Present when history has another page. Keep account_id and status unchanged when continuing.,
+                    }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      operationId: createTwapOrder
+      summary: Create a TWAP or VWAP order
+      tags: [Strategy Orders]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTwapOrderRequest" }
+      responses:
+        "200":
+          description: Idempotent replay.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TwapOrderEnvelope" }
+        "201":
+          description: Scheduled order created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TwapOrderEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/TradeRejected" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/twap-orders/{twap_order_id}:
+    get:
+      operationId: getTwapOrder
+      summary: Get a TWAP or VWAP order
+      tags: [Strategy Orders]
+      parameters:
+        - $ref: "#/components/parameters/TwapOrderId"
+      responses:
+        "200":
+          description: Scheduled order detail.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TwapOrderEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: cancelTwapOrder
+      summary: Stop future TWAP or VWAP slices
+      tags: [Strategy Orders]
+      parameters:
+        - $ref: "#/components/parameters/TwapOrderId"
+      responses:
+        "200":
+          description: Current scheduled-order state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TwapOrderEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/scaled-orders:
+    get:
+      operationId: listScaledOrders
+      summary: List scaled-order parents
+      tags: [Strategy Orders]
+      parameters:
+        - $ref: "#/components/parameters/AccountIdQuery"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 1024 }
+      responses:
+        "200":
+          description: Cursor-paginated scaled orders.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ScaledOrder" }
+                  has_more: { type: boolean }
+                  next_cursor: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      operationId: createScaledOrder
+      summary: Create a scaled price ladder
+      tags: [Strategy Orders]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateScaledOrderRequest" }
+      responses:
+        "200":
+          description: Idempotent replay.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScaledOrderEnvelope" }
+        "201":
+          description: Scaled order created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScaledOrderEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/TradeRejected" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/scaled-orders/{scaled_order_id}:
+    get:
+      operationId: getScaledOrder
+      summary: Get a scaled order and its rungs
+      tags: [Strategy Orders]
+      parameters:
+        - $ref: "#/components/parameters/ScaledOrderId"
+      responses:
+        "200":
+          description: Scaled-order detail.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScaledOrderEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: cancelScaledOrder
+      summary: Cancel a scaled order and its working rungs
+      tags: [Strategy Orders]
+      parameters:
+        - $ref: "#/components/parameters/ScaledOrderId"
+      responses:
+        "200":
+          description: Current scaled-order state and child cancellation counts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScaledOrderEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: MyFundedPerps API key
+      description: >-
+        API key beginning with `fp_live_` (live keys, served at
+        developers.myfundedperpetuals.com) or `fp_test_` (test keys, served at
+        sandbox.myfundedperpetuals.com). A key presented on the other host is
+        rejected with `401` and a message naming the correct host.
+  headers:
+    RequestId:
+      description: Stable identifier for support and log correlation.
+      schema: { type: string, format: uuid }
+    RetryAfter:
+      description: Seconds to wait before retrying.
+      schema: { type: integer, minimum: 1 }
+  parameters:
+    AccountId:
+      name: account_id
+      in: path
+      required: true
+      schema: { type: string }
+    AccountIdQuery:
+      name: account_id
+      in: query
+      required: true
+      description: Challenge account ID returned by `GET /v1/accounts`.
+      schema: { type: string }
+    OrderAccountIdQuery:
+      name: account_id
+      in: query
+      required: false
+      description: >-
+        Challenge account ID returned by GET /v1/accounts. Required unless
+        client_order_id is provided. When both are present, the order must
+        belong to this account.
+      schema: { type: string }
+    MarketId:
+      name: market_id
+      in: path
+      required: true
+      description: URL-encoded market ID, such as `binance%7CBTCUSDT`.
+      schema: { type: string }
+    OrderId:
+      name: order_id
+      in: path
+      required: true
+      schema: { type: string }
+    PositionId:
+      name: position_id
+      in: path
+      required: true
+      schema: { type: string }
+    TwapOrderId:
+      name: twap_order_id
+      in: path
+      required: true
+      schema: { type: string }
+    ScaledOrderId:
+      name: scaled_order_id
+      in: path
+      required: true
+      schema: { type: string }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Unique printable key for this intended operation. Reuse it only for an identical retry.
+      schema: { type: string, minLength: 1, maxLength: 128 }
+  responses:
+    BadRequest:
+      description: >-
+        Invalid request. Validation failures list every offending field in
+        `error.details`.
+      headers:
+        X-Request-Id: { $ref: "#/components/headers/RequestId" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Unauthorized:
+      description: Missing, invalid, or revoked API key.
+      headers:
+        WWW-Authenticate:
+          schema: { type: string }
+        X-Request-Id: { $ref: "#/components/headers/RequestId" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Forbidden:
+      description: The API key is valid but does not allow this operation.
+      headers:
+        X-Request-Id: { $ref: "#/components/headers/RequestId" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    NotFound:
+      description: Resource not found or not owned by the authenticated user.
+      headers:
+        X-Request-Id: { $ref: "#/components/headers/RequestId" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Conflict:
+      description: >-
+        The request conflicts with current state, an idempotency record, or a
+        client order ID.
+      headers:
+        X-Request-Id: { $ref: "#/components/headers/RequestId" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    TradeRejected:
+      description: The trading engine rejected the requested operation.
+      headers:
+        X-Request-Id: { $ref: "#/components/headers/RequestId" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/TradeRejectionEnvelope" }
+    RateLimited:
+      description: The per-IP request limit or an account-wide operation budget is exhausted.
+      headers:
+        Retry-After: { $ref: "#/components/headers/RetryAfter" }
+        X-Request-Id: { $ref: "#/components/headers/RequestId" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+  schemas:
+    CopyTradingGroupInput:
+      type: object
+      additionalProperties: false
+      if:
+        properties:
+          enabled: { const: true }
+        required: [enabled]
+      then:
+        properties:
+          targets: { minItems: 1 }
+      required: [enabled, source_account_id, targets]
+      properties:
+        config_id:
+          {
+            type: string,
+            description: Existing group ID; omit to create a group.,
+          }
+        enabled: { type: boolean }
+        source_account_id: { type: string }
+        targets:
+          type: array
+          maxItems: 20
+          description: At least one follower is required when enabled is true; disabled groups can have no followers.
+          items:
+            type: object
+            additionalProperties: false
+            required: [account_id, multiplier_bps]
+            properties:
+              account_id: { type: string }
+              multiplier_bps:
+                {
+                  type: integer,
+                  minimum: 1000,
+                  maximum: 20000,
+                  description: Applied after the follower-to-lead starting balance ratio; 10000 is proportional sizing.,
+                }
+    CopyTradingConfiguration:
+      type: object
+      required:
+        [
+          config_id,
+          enabled,
+          source_account_id,
+          targets,
+          policy_version,
+          updated_at,
+        ]
+      properties:
+        config_id: { type: string }
+        enabled: { type: boolean }
+        source_account_id: { type: string }
+        targets:
+          type: array
+          items:
+            type: object
+            required: [account_id, multiplier_bps]
+            properties:
+              account_id: { type: string }
+              multiplier_bps: { type: integer }
+        policy_version: { type: integer }
+        updated_at: { type: number }
+        stopped_at: { type: number }
+        stop_reason: { type: string }
+        stopped_completed_at: { type: number }
+        stop_cleanup_pending: { type: boolean }
+    CopyTradingWriteResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [ok]
+          properties:
+            ok: { type: boolean }
+            config_ids:
+              type: array
+              description: Saved IDs in submitted group order, including newly created groups. Present on save only.
+              items: { type: string }
+    AccountTradingPolicy:
+      {
+        "type": "object",
+        "required":
+          [
+            "account_id",
+            "observed_at",
+            "advisory",
+            "status",
+            "stage",
+            "manual_trading_blocked",
+            "opening_exposure_restricted",
+            "payout_pending",
+            "copy_follower_locked",
+            "copy_scope_blocked",
+            "fee_exempt",
+            "restriction",
+            "copy_stop",
+            "competition",
+            "trading_halt",
+            "limits",
+            "unlimited_trade_count_threshold",
+            "slippage_tolerance_bps",
+            "account_rules",
+            "maximum_total_notional_usd",
+          ],
+        "properties":
+          {
+            "account_id": { "type": "string" },
+            "observed_at": { "type": "number" },
+            "advisory":
+              {
+                "type": "boolean",
+                "description": "Always true; this response is advisory.",
+              },
+            "status": { "type": "string" },
+            "stage": { "type": "string", "enum": ["evaluation", "funded"] },
+            "manual_trading_blocked": { "type": "boolean" },
+            "opening_exposure_restricted": { "type": "boolean" },
+            "payout_pending": { "type": "boolean" },
+            "copy_follower_locked": { "type": "boolean" },
+            "copy_scope_blocked":
+              {
+                "type": "boolean",
+                "description": "An enabled source group contains a configured member outside this credential ownership, environment, archive, or allowlist authority. No member IDs are exposed. Operation-specific stale-copy checks remain authoritative.",
+              },
+            "fee_exempt": { "type": "boolean" },
+            "restriction":
+              {
+                "oneOf":
+                  [
+                    { "$ref": "#/components/schemas/TradingPolicyRestriction" },
+                    { "type": "null" },
+                  ],
+              },
+            "copy_stop":
+              {
+                "oneOf":
+                  [
+                    { "$ref": "#/components/schemas/TradingPolicyCopyStop" },
+                    { "type": "null" },
+                  ],
+              },
+            "competition":
+              {
+                "oneOf":
+                  [
+                    { "$ref": "#/components/schemas/TradingPolicyCompetition" },
+                    { "type": "null" },
+                  ],
+              },
+            "trading_halt":
+              { "$ref": "#/components/schemas/TradingPolicyHalt" },
+            "limits":
+              {
+                "type": "object",
+                "required":
+                  [
+                    "trades_per_minute",
+                    "trades_per_hour",
+                    "trades_per_day",
+                    "order_cooldown_ms",
+                    "max_open_positions",
+                    "max_position_value_usd",
+                    "min_order_notional_usd",
+                    "execution_delay_min_ms",
+                    "execution_delay_max_ms",
+                    "max_book_staleness_ms",
+                    "maintenance_margin_ratio_bps",
+                    "liquidation_fee_bps",
+                    "max_resting_orders",
+                    "risk_touch_window_ms",
+                  ],
+                "properties":
+                  {
+                    "trades_per_minute": { "type": "number" },
+                    "trades_per_hour": { "type": "number" },
+                    "trades_per_day": { "type": "number" },
+                    "order_cooldown_ms": { "type": "number" },
+                    "max_open_positions": { "type": "number" },
+                    "max_position_value_usd": { "type": "number" },
+                    "min_order_notional_usd": { "type": "number" },
+                    "execution_delay_min_ms": { "type": "number" },
+                    "execution_delay_max_ms": { "type": "number" },
+                    "max_book_staleness_ms": { "type": "number" },
+                    "maintenance_margin_ratio_bps": { "type": "number" },
+                    "liquidation_fee_bps": { "type": "number" },
+                    "max_resting_orders": { "type": "number" },
+                    "risk_touch_window_ms": { "type": "number" },
+                  },
+              },
+            "unlimited_trade_count_threshold": { "type": "number" },
+            "slippage_tolerance_bps":
+              { "$ref": "#/components/schemas/TradingPolicySlippage" },
+            "account_rules":
+              {
+                "type": "array",
+                "items":
+                  {
+                    "type": "object",
+                    "required": ["id", "parameters"],
+                    "properties":
+                      {
+                        "id": { "type": "string" },
+                        "parameters":
+                          {
+                            "type": "object",
+                            "additionalProperties":
+                              {
+                                "oneOf":
+                                  [{ "type": "number" }, { "type": "string" }],
+                              },
+                          },
+                      },
+                  },
+              },
+            "maximum_total_notional_usd":
+              {
+                "type": ["number", "null"],
+                "description": "Account model/size total exposure cap; null when not configured. No remaining-capacity reservation.",
+              },
+          },
+      }
+    TradingPolicySlippage:
+      type: object
+      required: [min, max, market_order_maximum_by_provider]
+      properties:
+        min: { type: number }
+        max: { type: number }
+        market_order_maximum_by_provider:
+          type: object
+          additionalProperties: { type: number }
+          description: Effective ceiling for ordinary market orders and closes after applying saved user slippage protection; keyed by public provider. Requested tolerance may tighten but cannot exceed this value. Strategy and emergency-exit policies are separate.
+    TradingPolicyHalt:
+      {
+        "type": "object",
+        "required": ["platform", "categories"],
+        "properties":
+          {
+            "platform": { "type": "boolean" },
+            "categories": { "type": "array", "items": { "type": "string" } },
+          },
+      }
+    TradingPolicyCompetition:
+      {
+        "type": "object",
+        "required": ["opening_exposure_restricted", "market_allowlist"],
+        "properties":
+          {
+            "opening_exposure_restricted": { "type": "boolean" },
+            "market_allowlist":
+              { "type": "array", "items": { "type": "string" } },
+          },
+      }
+    TradingPolicyCopyStop:
+      {
+        "type": "object",
+        "required": ["stopped_at", "completed_at", "acknowledged_at", "reason"],
+        "properties":
+          {
+            "stopped_at": { "type": "number" },
+            "completed_at": { "type": ["number", "null"] },
+            "acknowledged_at": { "type": ["number", "null"] },
+            "reason": { "type": ["string", "null"] },
+          },
+      }
+    TradingPolicyRestriction:
+      {
+        "type": "object",
+        "required": ["restriction", "reason", "flagged_at"],
+        "properties":
+          {
+            "restriction": { "type": "string", "enum": ["reduce_only"] },
+            "reason": { "type": "string" },
+            "flagged_at": { "type": "number" },
+          },
+      }
+    Account:
+      type: object
+      required:
+        [
+          id,
+          account_number,
+          name,
+          stage,
+          status,
+          starting_balance,
+          balance,
+          created_at,
+        ]
+      properties:
+        id: { type: string }
+        account_number: { type: string }
+        name: { type: string }
+        stage: { type: string, enum: [evaluation, funded] }
+        status: { type: string, enum: [active, passed, failed, closed] }
+        starting_balance: { type: number }
+        balance: { type: number }
+        created_at:
+          { type: number, description: Unix timestamp in milliseconds. }
+        risk: { $ref: "#/components/schemas/AccountRisk" }
+    AccountRisk:
+      type: object
+      required:
+        [
+          observed_at,
+          marks_complete,
+          missing_markets,
+          equity,
+          unrealized_pnl,
+          margin_used,
+          available_balance,
+          gross_exposure,
+          daily_loss_floor,
+          max_drawdown_floor,
+          daily_loss_room,
+          max_drawdown_room,
+          remaining_profit,
+          requirements,
+        ]
+      properties:
+        observed_at:
+          type: number
+          description: Server observation timestamp in milliseconds.
+        marks_complete:
+          type: boolean
+          description: True only when every open position had a fresh authoritative mark.
+        missing_markets:
+          type: array
+          items: { type: string }
+        equity:
+          type: [number, "null"]
+          description: Realized balance plus unrealized P&L. Null when marks are incomplete.
+        unrealized_pnl: { type: [number, "null"] }
+        margin_used:
+          type: number
+          description: Entry-valued margin reserved by open positions.
+        available_balance:
+          type: number
+          description: Realized balance less reserved margin, floored at zero.
+        gross_exposure:
+          type: [number, "null"]
+          description: Mark-valued open notional. Null when marks are incomplete.
+        daily_loss_floor: { type: [number, "null"] }
+        max_drawdown_floor: { type: [number, "null"] }
+        daily_loss_room:
+          type: [number, "null"]
+          description: Equity minus the daily loss floor.
+        max_drawdown_room:
+          type: [number, "null"]
+          description: Equity minus the maximum drawdown floor.
+        remaining_profit:
+          type: [number, "null"]
+          description: Realized profit still required to meet the evaluation target.
+        requirements:
+          type: object
+          required:
+            [
+              daily_loss_pct,
+              max_drawdown_pct,
+              profit_target_pct,
+              consistency_pct,
+              minimum_trading_days,
+            ]
+          properties:
+            daily_loss_pct: { type: [number, "null"] }
+            max_drawdown_pct: { type: [number, "null"] }
+            profit_target_pct: { type: [number, "null"] }
+            consistency_pct: { type: [number, "null"] }
+            minimum_trading_days: { type: [number, "null"] }
+    CancelAllOrdersEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/CancelAllOrdersOperation" }
+    CancelAllOrdersOperation:
+      type: object
+      required:
+        [
+          id,
+          operation,
+          account_id,
+          status,
+          total_count,
+          succeeded_count,
+          failed_count,
+          results,
+          created_at,
+        ]
+      properties:
+        id: { type: string }
+        operation: { type: string, const: cancel_all_orders }
+        account_id: { type: string }
+        status: { type: string, enum: [running, completed] }
+        total_count: { type: integer, minimum: 0, maximum: 200 }
+        succeeded_count: { type: integer, minimum: 0, maximum: 200 }
+        failed_count: { type: integer, minimum: 0, maximum: 200 }
+        results:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required: [order_id, status]
+            properties:
+              order_id: { type: string }
+              status: { type: string, enum: [canceled, queued, failed] }
+              queued: { type: boolean }
+              failure_code: { type: string }
+        created_at: { type: number }
+        completed_at: { type: number }
+    CloseAllPositionsEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/CloseAllPositionsOperation" }
+    CloseAllPositionsOperation:
+      type: object
+      required:
+        [
+          id,
+          operation,
+          account_id,
+          status,
+          total_count,
+          succeeded_count,
+          failed_count,
+          results,
+          created_at,
+        ]
+      properties:
+        id: { type: string }
+        operation: { type: string, const: close_all_positions }
+        account_id: { type: string }
+        status: { type: string, enum: [running, completed] }
+        total_count: { type: integer, minimum: 0, maximum: 100 }
+        succeeded_count: { type: integer, minimum: 0, maximum: 100 }
+        failed_count: { type: integer, minimum: 0, maximum: 100 }
+        results:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [position_id, status]
+            properties:
+              position_id: { type: string }
+              status: { type: string, enum: [submitted, failed] }
+              order: { $ref: "#/components/schemas/Order" }
+              failure_code: { type: string }
+              rule_id: { type: string }
+        created_at: { type: number }
+        completed_at: { type: number }
+    RestrictedCountry:
+      type: object
+      required: [country]
+      properties:
+        country:
+          type: string
+          description: ISO 3166-1 alpha-2 country code.
+          example: KP
+    Market:
+      type: object
+      required: [market_id, provider, symbol, coin, size_decimals, max_leverage]
+      properties:
+        market_id: { type: string, example: binance|BTCUSDT }
+        provider:
+          { type: string, enum: [binance, bybit, hyperliquid, lighter, fpx] }
+        symbol:
+          type: string
+          example: BTC
+          description: Display symbol for the market. Use coin for developer WebSocket subscriptions.
+        coin:
+          type: string
+          example: BTCUSDT
+          description: Exact venue symbol. Pass this value in the developer WebSocket symbols filter with this market's provider.
+        size_decimals: { type: integer, minimum: 0 }
+        max_leverage: { type: number, minimum: 1 }
+        market_type: { type: string }
+        category: { type: string }
+        trading_enabled: { type: boolean }
+        reduce_only: { type: boolean }
+    Quote:
+      type: object
+      required: [status, market_id, provider, symbol, coin, bid, ask, mid, time]
+      properties:
+        status: { type: string, const: ok }
+        market_id: { type: string }
+        provider: { type: string }
+        symbol: { type: string }
+        coin: { type: string }
+        bid:
+          {
+            type: number,
+            nullable: true,
+            description: Real best bid; null when unavailable for a mark-priced FX execution quote.,
+          }
+        ask:
+          {
+            type: number,
+            nullable: true,
+            description: Real best ask; null when unavailable for a mark-priced FX execution quote.,
+          }
+        mid:
+          {
+            type: number,
+            nullable: true,
+            description: Real book midpoint; not the FX execution reference.,
+          }
+        time: { type: number, description: Venue timestamp in milliseconds. }
+        fillable:
+          type: boolean
+          description: Present when side and size were supplied.
+        unfillable_reason:
+          type: string
+          enum: [empty_book, insufficient_depth, size_precision_mismatch]
+        requested_side: { type: string, enum: [buy, sell] }
+        requested_size: { type: number }
+        reference_price:
+          {
+            type: number,
+            nullable: true,
+            description: Price reference for the execution estimate.,
+          }
+        reference_kind: { type: string, enum: [venue_mark, book_mid] }
+        reference_time:
+          {
+            type: number,
+            description: Execution reference timestamp in milliseconds.,
+          }
+        estimated_fill_price:
+          type: number
+          description: Whole-size simulated fill price; FX uses venue mark plus or minus its fixed size-tier spread.
+        worst_price:
+          type: number
+          description: Same as estimated_fill_price for whole-size market fills.
+        estimated_notional: { type: number }
+        estimated_fee: { type: number }
+        fee_bps: { type: number }
+        levels_consumed: { type: integer }
+        depth: { type: string, enum: [standard, deep] }
+    Position:
+      type: object
+      required:
+        [
+          id,
+          account_id,
+          market_id,
+          provider,
+          symbol,
+          coin,
+          side,
+          size,
+          entry_price,
+          leverage,
+          margin_mode,
+          isolated_margin_extra,
+          status,
+          opened_at,
+        ]
+      properties:
+        id: { type: string }
+        account_id: { type: string }
+        market_id: { type: string }
+        provider: { type: string }
+        symbol: { type: string }
+        coin: { type: string }
+        side: { type: string, enum: [long, short] }
+        size: { type: number }
+        entry_price: { type: number }
+        leverage: { type: number }
+        margin_mode: { type: string, enum: [cross, isolated] }
+        liquidation_price: { type: number }
+        isolated_margin_extra: { type: number }
+        status: { type: string, enum: [open, closed] }
+        opened_at: { type: number }
+        closed_at: { type: number }
+        size_decimals: { type: integer, minimum: 0 }
+        exit_price: { type: number }
+        realized_pnl: { type: number }
+        realized_margin_basis: { type: number }
+        fees: { type: number }
+        funding: { type: number }
+    Order:
+      type: object
+      required:
+        [
+          id,
+          account_id,
+          market_id,
+          provider,
+          symbol,
+          coin,
+          type,
+          mode,
+          side,
+          size,
+          expected_price,
+          leverage,
+          margin_mode,
+          reduce_only,
+          status,
+          requested_at,
+        ]
+      properties:
+        id: { type: string }
+        client_order_id:
+          type: string
+          description: Caller-assigned order identity, when supplied at placement.
+        account_id: { type: string }
+        market_id: { type: string }
+        provider: { type: string }
+        symbol: { type: string }
+        coin: { type: string }
+        type:
+          type: string
+          enum:
+            [
+              market,
+              limit,
+              stop_market,
+              stop_limit,
+              take_market,
+              take_limit,
+              take_profit,
+              liquidation,
+              close_out,
+            ]
+        mode:
+          type: string
+          enum:
+            [
+              market,
+              limit,
+              chase,
+              stop_market,
+              stop_limit,
+              take_market,
+              take_limit,
+              take_profit,
+              conditional,
+              liquidation,
+              close_out,
+            ]
+        side: { type: string, enum: [buy, sell] }
+        size: { type: number }
+        initial_size: { type: number }
+        filled_size: { type: number }
+        expected_price: { type: number }
+        fill_price: { type: number }
+        trigger_price: { type: number }
+        limit_price: { type: number }
+        notional: { type: number }
+        fee: { type: number }
+        realized_pnl: { type: number }
+        leverage: { type: number }
+        margin_mode: { type: string, enum: [cross, isolated] }
+        reduce_only: { type: boolean }
+        time_in_force: { type: string, enum: [gtc, ioc, fok, gtd] }
+        gtd_expires_at: { type: number }
+        attached_take_profit_price: { type: number }
+        attached_stop_loss_price: { type: number }
+        chase_offset: { type: number }
+        chase_cap_price: { type: number }
+        trigger_market_id: { type: string }
+        trigger_direction: { type: string, enum: [above, below] }
+        triggered_at:
+          type: number
+          description: Millisecond timestamp of the most recent resting-to-pending execution attempt.
+        stop_triggered_at:
+          type: number
+          description: Millisecond timestamp when a conditional limit entered its limit leg. Absent while its trigger is still armed; once present it remains set.
+        cancel_requested_at:
+          type: number
+          description: Millisecond timestamp of cancellation intent. An in-flight execution may still fill before cancellation settles.
+        oco_sibling_order_id:
+          type: string
+          description: Paired TP or SL order. Fills retire matching size from the sibling; explicitly canceling one leg unlinks the survivor.
+        target_position_id: { type: string }
+        liquidity_role: { type: string, enum: [maker, taker] }
+        partial_of_order_id: { type: string }
+        partial_fill_root_order_id: { type: string }
+        twap_order_id: { type: string }
+        scaled_order_id: { type: string }
+        status:
+          {
+            type: string,
+            enum: [pending, filled, rejected, expired, resting, canceled],
+          }
+        reject_reason: { type: string }
+        reject_rule_id: { type: string }
+        requested_at: { type: number }
+        settled_at: { type: number }
+        canceled_at: { type: number }
+    OrderPage:
+      type: object
+      required: [data, has_more]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Order" }
+        has_more: { type: boolean }
+        next_cursor: { type: string }
+    CreateOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [account_id, market_id, side, size, leverage, margin_mode]
+      properties:
+        client_order_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: >-
+            Optional caller-assigned identity. It is unique across the user's
+            standard and position-close orders and remains searchable after API
+            key rotation.
+        type:
+          type: string
+          default: market
+          enum:
+            [
+              market,
+              limit,
+              chase,
+              stop_market,
+              stop_limit,
+              take_market,
+              take_limit,
+              take_profit,
+              conditional,
+            ]
+        account_id: { type: string }
+        market_id: { type: string, example: binance|BTCUSDT }
+        side: { type: string, enum: [buy, sell] }
+        size: { type: number, exclusiveMinimum: 0 }
+        expected_price:
+          type: number
+          exclusiveMinimum: 0
+          description: Midpoint observed by the client. Server execution never trusts this value for pricing.
+        leverage: { type: number, exclusiveMinimum: 0 }
+        margin_mode: { type: string, enum: [cross, isolated] }
+        slippage_tolerance_bps: { type: number, exclusiveMinimum: 0 }
+        reduce_only: { type: boolean, default: false }
+        take_profit_price: { type: number, exclusiveMinimum: 0 }
+        stop_loss_price: { type: number, exclusiveMinimum: 0 }
+        trigger_price: { type: number, exclusiveMinimum: 0 }
+        limit_price: { type: number, exclusiveMinimum: 0 }
+        time_in_force: { type: string, enum: [ioc, fok, gtd] }
+        gtd_expires_at: { type: number }
+        chase_offset: { type: number, minimum: 0 }
+        chase_cap_price: { type: number, exclusiveMinimum: 0 }
+        marketable_limit_acknowledged: { type: boolean }
+        replace_overlapping_exits:
+          type: boolean
+          description: |
+            Consent for the attached `take_profit_price` / `stop_loss_price`
+            legs to replace the resting exits they overlap when this order adds
+            to an existing position. Each attached leg covers the full
+            resulting position, so without this flag such a fill is rejected
+            with `rule_violation` / `exit-allocation`. Only accepted alongside
+            an attached leg.
+        trigger_market_id: { type: string }
+        trigger_direction: { type: string, enum: [above, below] }
+        target_position_id: { type: string }
+    OrderEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/Order" }
+        queued: { type: boolean }
+    ClosePositionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        client_order_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: >-
+            Optional caller-assigned identity for the resulting close order.
+        type:
+          { type: string, enum: [market, limit, conditional], default: market }
+        size:
+          type: number
+          exclusiveMinimum: 0
+          description: Omit to close the complete current position.
+        expected_price: { type: number, exclusiveMinimum: 0 }
+        slippage_tolerance_bps: { type: number, exclusiveMinimum: 0 }
+        limit_price: { type: number, exclusiveMinimum: 0 }
+        trigger_price: { type: number, exclusiveMinimum: 0 }
+        trigger_market_id: { type: string }
+        trigger_direction: { type: string, enum: [above, below] }
+        marketable_limit_acknowledged: { type: boolean }
+    ExitOrderBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_position_size, expected_orders, operations]
+      properties:
+        expected_position_size: { type: number, exclusiveMinimum: 0 }
+        expected_orders:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [order_id, price, size]
+            properties:
+              order_id: { type: string }
+              execution_type: { type: string, enum: [market, limit] }
+              price: { type: number, exclusiveMinimum: 0 }
+              size: { type: number, exclusiveMinimum: 0 }
+        operations:
+          type: array
+          items:
+            oneOf:
+              - type: object
+                additionalProperties: false
+                required: [kind, order_id]
+                properties:
+                  kind: { type: string, const: cancel }
+                  order_id: { type: string }
+              - type: object
+                additionalProperties: false
+                required: [kind, order_id, price]
+                properties:
+                  kind: { type: string, const: modify }
+                  order_id: { type: string }
+                  price: { type: number, exclusiveMinimum: 0 }
+                  size: { type: number, exclusiveMinimum: 0 }
+              - type: object
+                additionalProperties: false
+                required: [kind, group, price, size]
+                properties:
+                  kind: { type: string, const: place }
+                  group: { type: string, enum: [tp, sl] }
+                  execution_type: { type: string, enum: [market, limit] }
+                  price: { type: number, exclusiveMinimum: 0 }
+                  size: { type: number, exclusiveMinimum: 0 }
+                  oco_pair_with_operation_index: { type: integer, minimum: 0 }
+    CreateTwapOrderRequest:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          account_id,
+          market_id,
+          side,
+          size,
+          expected_price,
+          leverage,
+          margin_mode,
+          duration_minutes,
+        ]
+      properties:
+        account_id: { type: string }
+        market_id: { type: string }
+        strategy: { type: string, enum: [twap, vwap], default: twap }
+        side: { type: string, enum: [buy, sell] }
+        size: { type: number, exclusiveMinimum: 0 }
+        expected_price: { type: number, exclusiveMinimum: 0 }
+        leverage: { type: number, exclusiveMinimum: 0 }
+        margin_mode: { type: string, enum: [cross, isolated] }
+        duration_minutes: { type: integer, minimum: 5, maximum: 1440 }
+        slice_interval_seconds:
+          type: integer
+          minimum: 30
+          maximum: 43200
+          description: At most half the selected duration, with a global 12-hour ceiling.
+        randomize: { type: boolean, default: false }
+        reduce_only: { type: boolean, default: false }
+        trigger_price: { type: number, exclusiveMinimum: 0 }
+        max_price: { type: number, exclusiveMinimum: 0 }
+        min_price: { type: number, exclusiveMinimum: 0 }
+    TwapOrder:
+      type: object
+      required:
+        [
+          id,
+          account_id,
+          market_id,
+          strategy,
+          side,
+          total_size,
+          filled_size,
+          leverage,
+          margin_mode,
+          reduce_only,
+          duration_minutes,
+          slice_interval_seconds,
+          status,
+          started_at,
+          end_at,
+        ]
+      properties:
+        id: { type: string }
+        account_id: { type: string }
+        market_id: { type: string }
+        provider: { type: string }
+        symbol: { type: string }
+        coin: { type: string }
+        strategy: { type: string, enum: [twap, vwap] }
+        side: { type: string, enum: [buy, sell] }
+        total_size: { type: number }
+        filled_size: { type: number }
+        size_decimals: { type: integer }
+        average_price: { type: number }
+        leverage: { type: number }
+        margin_mode: { type: string, enum: [cross, isolated] }
+        reduce_only: { type: boolean }
+        duration_minutes: { type: integer }
+        slice_interval_seconds: { type: integer }
+        slice_count: { type: integer }
+        slices_attempted: { type: integer }
+        randomize: { type: boolean }
+        trigger_price: { type: number }
+        max_price: { type: number }
+        min_price: { type: number }
+        status: { type: string }
+        current_child_order_id: { type: string }
+        activated_at: { type: number }
+        started_at: { type: number }
+        end_at: { type: number }
+        next_run_at: { type: number }
+        canceled_at: { type: number }
+        completed_at: { type: number }
+        completion_reason: { type: string }
+    TwapOrderEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/TwapOrder" }
+    CreateScaledOrderRequest:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          account_id,
+          market_id,
+          side,
+          size,
+          start_price,
+          end_price,
+          rung_count,
+          distribution,
+          leverage,
+          margin_mode,
+        ]
+      properties:
+        account_id: { type: string }
+        market_id: { type: string }
+        side: { type: string, enum: [buy, sell] }
+        size: { type: number, exclusiveMinimum: 0 }
+        start_price: { type: number, exclusiveMinimum: 0 }
+        end_price: { type: number, exclusiveMinimum: 0 }
+        rung_count: { type: integer, minimum: 2, maximum: 10 }
+        distribution: { type: string, enum: [flat, ascending, descending] }
+        leverage: { type: number, exclusiveMinimum: 0 }
+        margin_mode: { type: string, enum: [cross, isolated] }
+        reduce_only: { type: boolean, default: false }
+        marketable_limit_acknowledged: { type: boolean }
+    ScaledOrder:
+      type: object
+      required:
+        [
+          id,
+          account_id,
+          market_id,
+          side,
+          total_size,
+          rung_count,
+          rungs,
+          status,
+          started_at,
+        ]
+      properties:
+        id: { type: string }
+        account_id: { type: string }
+        market_id: { type: string }
+        provider: { type: string }
+        symbol: { type: string }
+        coin: { type: string }
+        side: { type: string, enum: [buy, sell] }
+        total_size: { type: number }
+        size_decimals: { type: integer }
+        leverage: { type: number }
+        margin_mode: { type: string, enum: [cross, isolated] }
+        reduce_only: { type: boolean }
+        distribution: { type: string, enum: [flat, ascending, descending] }
+        start_price: { type: number }
+        end_price: { type: number }
+        rung_count: { type: integer }
+        placed_count: { type: integer }
+        rejected_count: { type: integer }
+        rungs:
+          type: array
+          items:
+            type: object
+            required: [price, size]
+            properties:
+              price: { type: number }
+              size: { type: number }
+              liquidity_role: { type: string, enum: [maker, taker] }
+              order_id: { type: string }
+              reject_reason: { type: string }
+        status: { type: string }
+        started_at: { type: number }
+        completed_at: { type: number }
+        canceled_at: { type: number }
+    ScaledOrderEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/ScaledOrder" }
+    ValidationIssue:
+      type: object
+      required: [field, issue]
+      properties:
+        field:
+          type: string
+          description: >-
+            Wire name of the offending request field, such as `size` or
+            `operations[2].price`. The value `body` refers to the whole
+            payload.
+        issue: { type: string }
+    Error:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        request_id: { type: string, format: uuid }
+        details:
+          type: array
+          description: >-
+            Present on request-validation failures, with one entry per
+            invalid field so a request can be fixed in one pass.
+          items: { $ref: "#/components/schemas/ValidationIssue" }
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error: { $ref: "#/components/schemas/Error" }
+    TradeRejection:
+      allOf:
+        - $ref: "#/components/schemas/Error"
+        - type: object
+          properties:
+            order_id: { type: string }
+            client_order_id: { type: string }
+            rule_id: { type: string }
+            details: { type: object, additionalProperties: true }
+    TradeRejectionEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error: { $ref: "#/components/schemas/TradeRejection" }

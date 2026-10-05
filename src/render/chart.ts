@@ -19,6 +19,7 @@ import { barSource } from "../analytics/types";
 import { tpoLetter } from "../analytics/tpo";
 import type { ChartModel } from "../model";
 import { fmtDate, fmtDateTime, fmtSigned, fmtTime, fmtUsd, fmtVol, type TimeZoneMode } from "./format";
+import type { Liquidation } from "../data/liquidations";
 import { placeLabel, type Rect } from "./stack";
 import { alpha, hatchPattern, readPalette, type Palette } from "./theme";
 
@@ -33,6 +34,7 @@ export interface ChartMeta {
   showDivergence: boolean;
   /** which series fills the lower pane */
   lowerPane: "cvd" | "oi";
+  showLiquidations: boolean;
   estDelta: boolean;
 }
 
@@ -87,6 +89,7 @@ export class FootprintChart {
     showDivergence: true,
     estDelta: false,
     lowerPane: "cvd",
+    showLiquidations: true,
   };
   private pal: Palette;
   private hatch: CanvasPattern | null = null;
@@ -100,6 +103,8 @@ export class FootprintChart {
   private taken: Rect[] = [];
   /** account overlay lines (price units), drawn by the extension panel */
   private accountLines: AccountLine[] = [];
+  /** forced liquidations, Binance markets only */
+  private liquidations: Liquidation[] = [];
 
   // view state
   barW = 84;
@@ -165,6 +170,12 @@ export class FootprintChart {
 
   setMeta(p: Partial<ChartMeta>) {
     this.meta = { ...this.meta, ...p };
+    this.request();
+  }
+
+  /** Forced liquidations to bubble on the chart (Binance markets only). */
+  setLiquidations(items: Liquidation[]) {
+    this.liquidations = items;
     this.request();
   }
 
@@ -376,6 +387,7 @@ export class FootprintChart {
       if (view === "footprint") this.drawDevelopingPoc(i0, i1);
     }
     if (this.meta.showMarkers && view === "footprint") this.drawContextMarkers();
+    if (this.meta.showLiquidations) this.drawLiquidations(i0, i1);
     this.drawAccountLines();
     if (this.meta.showDivergence && view !== "tpo") this.drawDivergencesPrice(i0, i1);
     this.drawLastPrice();
@@ -1043,6 +1055,50 @@ export class FootprintChart {
    * labelled as floors. Labels go through the same stacker as the context
    * pills, so a stop sitting on a breach line stays readable.
    */
+  /**
+   * Forced liquidations as bubbles at the price they filled, area proportional
+   * to notional so a big one reads as big. Colour follows which side was
+   * liquidated: a liquidated long is a forced sell, so it takes the sell
+   * colour. The feed is sampled at one event per second per symbol, so this
+   * shows that liquidations happened, not how many — the legend says so.
+   */
+  private drawLiquidations(i0: number, i1: number) {
+    const m = this.model!;
+    if (!this.liquidations.length || !m.bars.length) return;
+    const ctx = this.ctx;
+    const L = this.L;
+    const from = m.bars[Math.max(0, i0)].t;
+    const lastBar = m.bars[Math.min(m.bars.length - 1, i1)];
+    const to = lastBar.t + lastBar.dur;
+
+    const vis = this.liquidations.filter((l) => l.t >= from && l.t < to);
+    if (!vis.length) return;
+    let maxN = 0;
+    for (const l of vis) maxN = Math.max(maxN, l.notional);
+    if (maxN <= 0) return;
+
+    const barMs = m.bars[0].dur;
+    for (const l of vis) {
+      const idx = Math.floor((l.t - m.bars[0].t) / barMs);
+      if (idx < 0 || idx >= m.bars.length) continue;
+      const x = this.xLeft(idx) + this.barW / 2;
+      const y = this.yOf(l.price);
+      if (y < L.mainY0 || y > L.mainY1) continue;
+      // area proportional to notional means radius proportional to its root
+      const r = 2.5 + Math.sqrt(l.notional / maxN) * 11;
+      const col = l.side === "long" ? this.pal.sell : this.pal.buy;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      // these sit over dense footprint cells, so they need a little weight
+      ctx.fillStyle = alpha(col, 0.3);
+      ctx.fill();
+      ctx.strokeStyle = alpha(col, 0.95);
+      ctx.lineWidth = 1.25;
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+  }
+
   private drawAccountLines() {
     if (!this.accountLines.length) return;
     const ctx = this.ctx;

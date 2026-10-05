@@ -138,6 +138,29 @@ lands a little short of the floor — about $0.037 on that position. That cushio
 reported by `exitCost()` rather than folded into the line, so the line keeps meaning
 the same thing the platform's does.
 
+## Open interest and liquidations
+
+- **Open interest.** MFP's stream carries live OI, so it is sampled per minute for every
+  market and shown as a ΔOI pane (**Display → Lower pane**): change per bar as signed bars,
+  the level as a line. Each session's net change gets the standard four-way reading —
+  new longs, short covering, new shorts, long liquidation — with a 0.1% dead zone so a
+  move too small to mean anything reads "flat". **Context, not signals.**
+- **OI history** exists only for Binance-provider markets, where Binance publishes it
+  (CORS-open, so the page reads it directly). One request returns 500 rows, so the
+  resolution is chosen to cover the window: 15m for 3–5 days, 30m for 10. It is coarser
+  than the bars and is labelled as such. Hyperliquid markets get live OI only and say so;
+  their only published figure duplicates what MFP already streams.
+- **Liquidations** are Binance-only too (`@forceOrder`), drawn as bubbles at the fill
+  price with area proportional to notional — a liquidated long is a forced sell, so it
+  takes the sell colour. Binance samples that feed to **one event per second per symbol**,
+  so it shows that liquidations happened, not how many; the panel says so. Other venues
+  publish none, and the app says *"no public liquidation feed for this venue"* rather
+  than inventing one.
+
+A bar with no OI observation is **blank, not zero** — a zero bar would claim "observed,
+unchanged" where the truth is "not observed". The same rule holds in the sessions table,
+the tooltip and the MCP responses, which return `null` rather than `0`.
+
 ## Optional: the 24/7 recorder
 
 The trade stream is live-only, so the browser can only show real aggressor delta from the

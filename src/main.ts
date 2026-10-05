@@ -12,6 +12,7 @@ import { MarketFeed, type FeedChange } from "./data/feed";
 import { DEFAULT_MARKET_ID, defaultSession, isTradFi, loadMarkets, marketLabel, type Market } from "./data/markets";
 import { loadMinutes, saveMinutes } from "./data/persist";
 import { binanceSymbol, fetchOiHistory } from "./data/binance-oi";
+import { LIQ_CAVEAT, LiquidationFeed, NO_LIQ_FEED } from "./data/liquidations";
 import { fetchRecorder, mergeRestored } from "./data/recorder";
 import { MarketStream } from "./data/stream";
 import { allowanceShare, getAccountState, getAccounts, getQuote, inExtension, keyStatus, type AccountSummary } from "./ext/account";
@@ -45,6 +46,8 @@ interface UiSettings {
   tz: TimeZoneMode;
   /** which series fills the lower pane */
   lower: "cvd" | "oi";
+  /** bubble forced liquidations (Binance markets only) */
+  liquidations: boolean;
   /** optional recorder service base URL (see recorder/) */
   recorderUrl: string;
   theme: "dark" | "light";
@@ -66,6 +69,7 @@ const defaults: UiSettings = {
   va: 0.7,
   tz: "local",
   lower: "cvd",
+  liquidations: true,
   recorderUrl: "",
   theme: "dark",
   panel: true,
@@ -201,6 +205,8 @@ let markets: Market[] = [];
 let marketsNote: string | undefined;
 let recorderNote: string | null = null;
 let oiNote: string | null = null;
+let liqFeed: LiquidationFeed | null = null;
+let liqNote: string | null = null;
 let feed: MarketFeed | null = null;
 let market: Market | null = null;
 
@@ -310,6 +316,7 @@ function rebuild() {
     showDivergence: ui.divergence,
     estDelta: ui.estDelta,
     lowerPane: ui.lower,
+    showLiquidations: ui.liquidations,
   });
   showEmpty();
   renderPanel();
@@ -354,6 +361,9 @@ async function selectMarket(id: string) {
   chart.setModel(model);
   showEmpty();
   oiNote = null;
+  liqFeed?.stop();
+  liqFeed = null;
+  liqNote = null;
   const f = new MarketFeed(stream, m, {
     priorSessions: Math.max(1, ui.days - 1),
     session: { mode: sessionModeFor(m) },
@@ -380,6 +390,21 @@ async function selectMarket(id: string) {
   // Hyperliquid only exposes a current value that duplicates MFP's live one.
   // Runs alongside start() because it is independent of the trade stream.
   const sym = binanceSymbol(m);
+  if (sym) {
+    // only Binance publishes one; never imply a feed that does not exist
+    liqNote = LIQ_CAVEAT;
+    const lf = new LiquidationFeed(sym, {
+      onChange: () => {
+        if (liqFeed === lf) chart.setLiquidations(lf.items);
+      },
+    });
+    liqFeed = lf;
+    lf.start();
+    chart.setLiquidations(lf.items);
+  } else {
+    liqNote = NO_LIQ_FEED;
+    chart.setLiquidations([]);
+  }
   const backfill = sym
     ? fetchOiHistory(sym, ui.days).then((r) => {
         if (feed !== f) return;
@@ -461,7 +486,7 @@ elSession.addEventListener("change", () => {
   saveUi();
   schedule();
 });
-const bindCheck = (el: HTMLInputElement, key: "markers" | "divergence" | "estDelta") => {
+const bindCheck = (el: HTMLInputElement, key: "markers" | "divergence" | "estDelta" | "liquidations") => {
   el.checked = ui[key];
   el.addEventListener("change", () => {
     ui[key] = el.checked;
@@ -472,6 +497,7 @@ const bindCheck = (el: HTMLInputElement, key: "markers" | "divergence" | "estDel
 bindCheck(elMarkers, "markers");
 bindCheck(elDiv, "divergence");
 bindCheck(elEst, "estDelta");
+bindCheck($<HTMLInputElement>("optLiq"), "liquidations");
 elImb.value = String(ui.imb);
 elImb.addEventListener("change", () => {
   ui.imb = Number(elImb.value);
@@ -858,6 +884,7 @@ function renderPanel() {
   if (marketsNote && markets.length && f.history.state !== "done" && !model.bars.length) parts.push(`<div class="banner">${esc(marketsNote)}</div>`);
   if (recorderNote) parts.push(`<p class="note">Recorder: ${esc(recorderNote)}</p>`);
   if (oiNote) parts.push(`<p class="note">Open interest: ${esc(oiNote)}</p>`);
+  if (liqNote) parts.push(`<p class="note">Liquidations: ${esc(liqNote)}${liqFeed ? ` · ${liqFeed.items.length} seen · ${esc(liqFeed.state)}` : ""}</p>`);
 
   // --- session
   parts.push(`<h2>Current session <span class="tag">${esc(sessionModeFor(m) === "ny18" ? "18:00 ET" : "UTC day")}</span></h2>`);
